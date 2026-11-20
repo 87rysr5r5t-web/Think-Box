@@ -1,0 +1,419 @@
+# Auditoría funcional de Think Box
+
+## Fase 0
+
+Swift 6, SwiftUI y AppKit en macOS 14+. TextKit para el editor, PDFKit para PDF y Quick Look para otros archivos. La biblioteca local usa JSON atómico y adjuntos contiguos. Las preferencias se guardan aparte en UserDefaults. Las acciones se concentran en las vistas y el almacén de biblioteca. Think Box conserva su diseño propio.
+
+El directorio de trabajo carece de repositorio Git. Los estados parciales reflejan la cobertura encontrada en código. Verificar los atajos y los flujos ambiguos con DEVONthink 4. [Manual público de atajos de DEVONthink 3](https://download.devontechnologies.com/download/devonthink/3.8.2/DEVONthink.help/Contents/Resources/pgs/appendix-shortcuts.html).
+
+## Verificación de esta fase
+
+Pasaron 11 pruebas, incluida la nueva búsqueda difusa. En macOS se comprobó que ⇧⌘P abre la paleta, que la secuencia «nv pr» abre el diálogo de proyecto, que ⌘P abre un documento y que la barra lateral se controla desde Visualización y con ⇧⌘L.
+
+## Fase 1
+
+Separación de las cuatro zonas, barra común, ruta y estado, cuatro disposiciones, inspector, pestañas e historial implementados. Pasaron 12 pruebas automatizadas. La verificación visual de esta entrega quedó pendiente tras caducar en dos intentos. El inventario marca como parciales las funciones que aún tienen criterios pendientes, incluidos los espacios guardados, la selección múltiple y la manipulación avanzada de pestañas.
+
+## Siguiente fase
+
+- Integrar el gesto horizontal con fases de AppKit y pruebas de dirección, inercia, umbral y prioridad del desplazamiento horizontal del documento.
+- Separar fuente y previsualización de Markdown. Implementar un motor paginado compartido con impresión y PDF y preferencias independientes por superficie.
+
+## Inventario
+
+| ID | Función | Estado | Evidencia | Notas |
+| --- | --- | --- | --- | --- |
+| UI-01 | Ventana principal de tres zonas principales + inspector: Barra lateral (navegación) · Lista de elementos · Visor/editor de documento · Inspector (a la derecha), más barra de herramientas arriba, barra de ruta/navegación y barra de estado abajo. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:23 | Navegación, lista, visor e inspector separados; ruta, selección y estado conectados. Faltan campos y acciones de la especificación. |
+| UI-02 | Disposiciones del visor de documento (Visualización → Disposición): Pantalla ancha (lista a la izquierda, documento a la derecha), División vertical (lista arriba, documento abajo), Sin vista previa (solo lista) y Documento a pantalla completa dentro de la ventana. Se recuerda por ventana y por grupo. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:416 | Cuatro disposiciones con selección conservada. Se guarda por escena y por proyecto, y se conservan los controles nativos de pantalla completa. |
+| UI-03 | Pestañas en la ventana principal (como DEVONthink 3/4): cada pestaña es un grupo/documento independiente; nueva pestaña, cerrar, reordenar arrastrando, mover a ventana nueva, vista general de pestañas. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:479 | Creación, cambio y cierre, con grupo, consulta, selección e historial por pestaña en la sesión. Pendientes reordenación, vista general y pestañas temporales. |
+| UI-04 | Ventanas de documento independientes (abrir documento en ventana nueva) con su propia barra de herramientas reducida e inspector. | 🟡 Parcial | Sources/ThinkBox/StandaloneDocument.swift:4 | Ventana editable dedicada con los paneles emergentes existentes. |
+| UI-05 | Espacios de trabajo (Workspaces): guardar, restaurar, renombrar y borrar la disposición completa de ventanas, pestañas, paneles y grupos abiertos. | ❌ Ausente | — | Pendiente de su fase. |
+| UI-06 | Selección múltiple, arrastrar y soltar en todas las zonas (mover, ⌥ duplicar, ⌘⌥ replicar), con indicadores de destino. | ❌ Ausente | — | Pendiente de su fase. |
+| UI-07 | Navegación Atrás/Adelante con historial por ventana; Subir al grupo contenedor. | 🟡 Parcial | Sources/WritingLibrary/NavigationHistory.swift:1 | Historial detrás y delante por pestaña; los cambios de rama están cubiertos por prueba. Subir al grupo contenedor requiere jerarquía de grupos. |
+| UI-08 | Toda selección se refleja instantáneamente en el inspector, la barra de ruta y la barra de estado. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:23 | Navegación, lista, visor e inspector separados; ruta, selección y estado conectados. Faltan campos y acciones de la especificación. |
+| UI-09 | Modo de pantalla completa nativo y modo Enfoque (oculta todo salvo el documento). | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:416 | Cuatro disposiciones con selección conservada. Se guarda por escena y por proyecto, y se conservan los controles nativos de pantalla completa. |
+| ST-01 | Tema oscuro (por defecto), | ✅ Completa | Sources/ThinkBox/AppSettings.swift:54 | Oscuro por defecto para preferencias nuevas; se conserva un tema previamente guardado. |
+| ST-02 | tema claro equivalente, | ✅ Completa | Sources/ThinkBox/ThinkBoxApp.swift:14 | Validado en macOS en la versión anterior. |
+| ST-03 | seguir apariencia del sistema, | ✅ Completa | Sources/ThinkBox/ThinkBoxApp.swift:14 | Validado en macOS en la versión anterior. |
+| ST-04 | importar/exportar temas en JSON (estilo de temas de VS Code). | ❌ Ausente | — | Pendiente de su fase. |
+| ST-05 | Las 7 etiquetas de color de DEVONthink se reinterpretan con tonos desaturados que funcionan en oscuro y claro. | ❌ Ausente | — | Pendiente de su fase. |
+| ST-06 | UI: Inter o SF Pro, 12–13 px; títulos de sección en versalitas de 11 px con espaciado de 0,04 em; código y texto plano: JetBrains Mono / SF Mono 13 px. | 🟡 Parcial | Sources/ThinkBox/AppSettings.swift:54 | Quattro y JetBrains Mono Light se conservan por el criterio tipográfico anterior. Verificar cambio de la fuente de interfaz a Inter/SF Pro. |
+| ST-07 | Radios: 4 px (botones pequeños), 6 px (campos, filas), 8 px (popovers, paleta). Bordes de 1 px. Sin degradados. Sombras solo en elementos flotantes. | 🟡 Parcial | Sources/ThinkBox/WindowChrome.swift:3 | Tokens de geometría y paleta en la ventana principal. Otras superficies se migrarán al intervenirlas. |
+| ST-08 | Iconografía lineal de 16 px, trazo 1,5 (Lucide o Codicons, con licencia libre), monocroma en text-secondary, text-primary en hover/activo. | 🟡 Parcial | Sources/ThinkBox/WindowChrome.swift:3 | Paleta y símbolos compartidos en zonas principales. Unificación completa pendiente. |
+| ST-09 | Densidad alta: filas de 22–24 px en listas y árboles; barra de estado de 22 px; barra de herramientas compacta integrada en la barra de título (semáforos de macOS integrados). | 🟡 Parcial | Sources/ThinkBox/WindowChrome.swift:3 | Paleta y símbolos compartidos en zonas principales. Unificación completa pendiente. |
+| ST-10 | Animaciones de 120–180 ms con ease-out; respetar "Reducir movimiento" del sistema. | ❌ Ausente | — | Pendiente de su fase. |
+| ST-11 | Barras de desplazamiento finas superpuestas que aparecen al desplazar. | 🟡 Parcial | Sources/ThinkBox/WindowChrome.swift:3 | Paleta y símbolos compartidos en zonas principales. Unificación completa pendiente. |
+| ST-12 | Pestañas estilo editor de Cursor: pestaña activa con fondo bg-editor y línea de acento superior de 1 px; indicador de "sin guardar" (punto) que se convierte en × al pasar el ratón; pestañas en cursiva para vista previa temporal (abrir con un clic = pestaña provisional, doble clic = fija). | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:479 | Creación, cambio y cierre, con grupo, consulta, selección e historial por pestaña en la sesión. Pendientes reordenación, vista general y pestañas temporales. |
+| ST-13 | Paleta de comandos (⌘⇧P) con búsqueda difusa sobre todos los comandos, y Ir a… (⌘P) para abrir documentos/grupos por nombre en todas las bases abiertas. Muestra atajo a la derecha de cada comando. | 🟡 Parcial | Sources/ThinkBox/LibraryCommands.swift:62; Tests/WritingLibraryTests/FuzzyTitleQueryTests.swift | Registro inicial; búsqueda difusa, atajos e Ir a en la biblioteca activa. La cobertura crece con los comandos y bases nuevas. |
+| ST-14 | Migas de pan (breadcrumbs) encima del documento: Base › Grupo › Subgrupo › Documento, cada segmento clicable con desplegable de hermanos. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:446 | Ruta de biblioteca, proyecto/ámbito y documento encima del visor. Faltan los menús de hermanos y grupos anidados. |
+| ST-15 | Divisores de paneles de 1 px con zona de arrastre de 6 px; doble clic en divisor = plegar/desplegar el panel. | 🟡 Parcial | Sources/ThinkBox/WorkspaceLayout.swift:37 | Divisores de 1 pt, zona de 6 pt, arrastre y doble clic. Paneles accesibles por barra, menú y paleta. El gesto de trackpad y la persistencia por pestaña y espacio de trabajo siguen pendientes. |
+| ST-16 | Menús contextuales y popovers con bg-elevated, borde de 1 px y radio de 8 px; separadores finos; atajos alineados a la derecha en text-tertiary. | ❌ Ausente | — | Pendiente de su fase. |
+| GS-01 | Detección del gesto. Un deslizamiento con dos dedos en el trackpad llega como eventos de desplazamiento (scroll) con fases. Se considera gesto horizontal cuando \|Δx\| > 2·\|Δy\| en los primeros eventos de la fase began. Se ignoran los eventos de inercia (momentum) posteriores al fin del gesto. Ratones con rueda: solo si tienen desplazamiento horizontal y el usuario lo activa en Preferencias. | ❌ Ausente | — | Pendiente de su fase. |
+| GS-02 | Dirección. Deslizar los dedos hacia el borde donde vive el panel lo pliega; deslizar desde el borde hacia el centro lo despliega. Ejemplo: dedos hacia la izquierda sobre la barra lateral izquierda → se pliega; dedos hacia la derecha cerca del borde izquierdo → se despliega. Simétrico para el inspector a la derecha. | ❌ Ausente | — | Pendiente de su fase. |
+| GS-03 | Zona de actuación. El gesto controla el panel sobre el que está el puntero, su divisor, o una franja de 24 px junto al borde de la ventana cuando el panel está plegado. Sobre el documento, el gesto actúa sobre el panel más cercano solo si el contenido bajo el puntero no admite desplazamiento horizontal o ya está en su límite (tablas anchas, PDF ampliado, código sin ajuste de línea tienen prioridad para desplazarse). | ❌ Ausente | — | Pendiente de su fase. |
+| GS-04 | Seguimiento interactivo. El panel sigue a los dedos en tiempo real (ancho proporcional al desplazamiento, con resistencia elástica al sobrepasar los límites). Al soltar: se completa la acción si se ha recorrido ≥ 40 % del ancho del panel o si la velocidad supera un umbral; si no, vuelve a su estado. Animación de 160 ms. | ❌ Ausente | — | Pendiente de su fase. |
+| GS-05 | Plegado en cascada (configurable, activado por defecto). Deslizamientos sucesivos hacia la izquierda sobre el documento pliegan, en orden: barra lateral → lista de elementos → (documento a ancho completo). Hacia la derecha se despliegan en orden inverso. Lo mismo hacia la derecha con inspector → panel de chat/esquema. | ❌ Ausente | — | Pendiente de su fase. |
+| GS-06 | Plegado de nodos en árboles (secundario, configurable). En la barra lateral y en la vista de columnas/esquema: gesto horizontal corto sobre una fila con hijos → derecha despliega el nodo, izquierda lo pliega (equivalente a las flechas → / ← del teclado). | 🟡 Parcial | Sources/WritingLibrary/Tags.swift:105 | Jerarquía de etiquetas y herencia. El árbol usa control nativo de despliegue. |
+| GS-07 | Equivalencias. Todo lo que hace el gesto existe también como menú (Visualización → Mostrar/Ocultar …), atajo, botón de la barra de herramientas y doble clic en el divisor. | 🟡 Parcial | Sources/ThinkBox/WorkspaceLayout.swift:37 | Divisores de 1 pt, zona de 6 pt, arrastre y doble clic. Paneles accesibles por barra, menú y paleta. El gesto de trackpad y la persistencia por pestaña y espacio de trabajo siguen pendientes. |
+| GS-08 | Persistencia. El estado plegado/desplegado y el ancho de cada panel se guardan por ventana, por pestaña y en los Workspaces. | 🟡 Parcial | Sources/ThinkBox/WorkspaceLayout.swift:37 | Divisores de 1 pt, zona de 6 pt, arrastre y doble clic. Paneles accesibles por barra, menú y paleta. El gesto de trackpad y la persistencia por pestaña y espacio de trabajo siguen pendientes. |
+| GS-09 | Preferencias → Gestos: activar/desactivar; sensibilidad (baja/media/alta); umbral de recorrido; invertir dirección; cascada sí/no; plegado de nodos sí/no; permitir en ratón con rueda horizontal; zona de borde (px). | ❌ Ausente | — | Pendiente de su fase. |
+| GS-10 | Accesibilidad. Anunciar con VoiceOver "Barra lateral plegada/desplegada"; con "Reducir movimiento" el cambio es instantáneo; nunca bloquear el desplazamiento vertical. | ❌ Ausente | — | Pendiente de su fase. |
+| GS-11 | Criterios de aceptación. Sin falsos positivos al desplazar verticalmente listas largas; sin conflicto con el desplazamiento horizontal de contenidos; 60 fps durante el seguimiento; funciona con desplazamiento natural activado y desactivado. | ❌ Ausente | — | Pendiente de su fase. |
+| PG-01 | Qué es. Modo de maquetación paginada (como "Diseño de impresión" de un procesador de textos): el texto fluye en hojas de papel con tamaño, márgenes, encabezado y pie, separadas por huecos sobre un fondo neutro, con sombra suave en cada hoja. | ❌ Ausente | — | Pendiente de su fase. |
+| PG-02 | Dónde se aplica. A todos los tipos de texto editables: texto plano, texto enriquecido (RTF/RTFD), Markdown (editor de código fuente y previsualización renderizada), notas con formato/HTML (WYSIWYG y vista renderizada). | ❌ Ausente | — | Pendiente de su fase. |
+| PG-03 | Dos interruptores independientes. | ❌ Ausente | — | Pendiente de su fase. |
+| PG-04 | Controles. Botón con icono de hoja en la barra de cada panel (editor/previsualización); menú Visualización → Vista de página → Editor / Previsualización / Ambos / Ninguno; atajos dedicados; comandos en la paleta; preferencia por defecto por tipo de documento y valor guardado por documento (en sus metadatos). | ❌ Ausente | — | Pendiente de su fase. |
+| PG-05 | Configuración de página (Formato → Configurar página…, también accesible desde un icono de engranaje en la regla): tamaño (A4, A5, B5, Carta, Legal, Ejecutivo, personalizado), orientación, márgenes (Normal, Estrecho, Ancho, Espejo para libro, personalizado), columnas (1–3), encabezado y pie con campos ({titulo}, {pagina}, {paginas}, {fecha}, {base}, {grupo}, {autor}), primera página distinta, páginas pares/impares distintas, numeración inicial. | ❌ Ausente | — | Pendiente de su fase. |
+| PG-06 | Edición real en páginas. En el editor paginado se escribe con normalidad: el cursor y la selección cruzan los límites de página, el texto refluye en tiempo real, deshacer/rehacer, búsqueda y corrección ortográfica funcionan igual que en modo continuo. | ❌ Ausente | — | Pendiente de su fase. |
+| PG-07 | Previsualización paginada con motor de paginación (p. ej. Paged.js en web, o el motor de impresión nativo): control de viudas y huérfanas, títulos unidos al párrafo siguiente, imágenes y tablas que no se parten mal, notas al pie al final de página si el formato lo admite. | ❌ Ausente | — | Pendiente de su fase. |
+| PG-08 | Fidelidad. Lo que muestra la previsualización paginada debe coincidir exactamente con Imprimir y Exportar a PDF (mismo motor, misma paginación). | ❌ Ausente | — | Pendiente de su fase. |
+| PG-09 | Saltos de página manuales. Formato → Insertar salto de página (⌘↩ o el atajo que corresponda). En Markdown se representa como <div style="page-break-after: always"></div> (o convención documentada) y se respeta en previsualización, impresión y PDF. | ❌ Ausente | — | Pendiente de su fase. |
+| PG-10 | Zoom y disposición. Ajustar al ancho, Ajustar a la página, 50–400 %; una página, dos páginas enfrentadas, desplazamiento continuo o página a página. ⌘+ / ⌘− / ⌘0. Zoom con pellizco. | ❌ Ausente | — | Pendiente de su fase. |
+| PG-11 | Reglas. Regla horizontal y vertical opcionales con márgenes arrastrables y sangrías/tabuladores (en RTF/notas con formato). | ❌ Ausente | — | Pendiente de su fase. |
+| PG-12 | Indicadores. Barra de estado: "Página 3 de 12"; comando Ir a página…; miniaturas de páginas opcionales en el panel de esquema. | ❌ Ausente | — | Pendiente de su fase. |
+| PG-13 | Sincronización editor ↔ previsualización también en modo paginado (mapa de posiciones fuente → página), con opción de desplazamiento sincronizado. | ❌ Ausente | — | Pendiente de su fase. |
+| PG-14 | Tema. En tema oscuro, opción "papel blanco" (por defecto) o "papel oscuro"; el fondo entre hojas usa bg-editor con un tono más profundo. | ❌ Ausente | — | Pendiente de su fase. |
+| PG-15 | Rendimiento. Pulsación de tecla < 16 ms en documentos de 300 páginas; virtualización de páginas fuera de pantalla; repaginación incremental. | ❌ Ausente | — | Pendiente de su fase. |
+| TB-01 | Mostrar/ocultar barra lateral | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:446 | Control del panel disponible en barra, menú y paleta. |
+| TB-02 | Atrás / Adelante | 🟡 Parcial | Sources/WritingLibrary/NavigationHistory.swift:1 | Historial detrás y delante por pestaña; los cambios de rama están cubiertos por prueba. Subir al grupo contenedor requiere jerarquía de grupos. |
+| TB-03 | Subir (grupo contenedor) | ❌ Ausente | — | Pendiente de su fase. |
+| TB-04 | Selector de vista de la lista: Iconos / Lista / Columnas | ❌ Ausente | — | Pendiente de su fase. |
+| TB-05 | Selector de disposición: Pantalla ancha / División vertical / Sin vista previa | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:416 | Cuatro disposiciones con selección conservada. Se guarda por escena y por proyecto, y se conservan los controles nativos de pantalla completa. |
+| TB-06 | Nuevo (con menú desplegable de todos los tipos y plantillas) | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| TB-07 | Nuevo grupo | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| TB-08 | Importar | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| TB-09 | Capturar (clipping del portapapeles o web) | ❌ Ausente | — | Pendiente de su fase. |
+| TB-10 | Mover a… | ❌ Ausente | — | Pendiente de su fase. |
+| TB-11 | Replicar a… | ❌ Ausente | — | Pendiente de su fase. |
+| TB-12 | Duplicar | ❌ Ausente | — | Pendiente de su fase. |
+| TB-13 | Fusionar | ❌ Ausente | — | Pendiente de su fase. |
+| TB-14 | Agrupar | ❌ Ausente | — | Pendiente de su fase. |
+| TB-15 | Clasificar (sugerencias IA) | ❌ Ausente | — | Pendiente de su fase. |
+| TB-16 | Ver también | ❌ Ausente | — | Pendiente de su fase. |
+| TB-17 | Etiqueta de color | ❌ Ausente | — | Pendiente de su fase. |
+| TB-18 | Valoración | ❌ Ausente | — | Pendiente de su fase. |
+| TB-19 | Marcador (bandera) | ❌ Ausente | — | Pendiente de su fase. |
+| TB-20 | Leído/No leído | ❌ Ausente | — | Pendiente de su fase. |
+| TB-21 | Bloquear | ❌ Ausente | — | Pendiente de su fase. |
+| TB-22 | Etiquetas (tags) | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| TB-23 | Recordatorio | ❌ Ausente | — | Pendiente de su fase. |
+| TB-24 | OCR | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| TB-25 | Convertir | ❌ Ausente | — | Pendiente de su fase. |
+| TB-26 | Procesar por lotes | ❌ Ausente | — | Pendiente de su fase. |
+| TB-27 | Compartir | ❌ Ausente | — | Pendiente de su fase. |
+| TB-28 | Abrir con… / Abrir externamente | 🟡 Parcial | Sources/ThinkBox/FilePreview.swift:4 | Quick Look y apertura externa según formato; sin visor especializado completo. |
+| TB-29 | Mostrar en Finder | ❌ Ausente | — | Pendiente de su fase. |
+| TB-30 | Imprimir | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| TB-31 | Mover a la papelera | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| TB-32 | Sincronizar ahora (con indicador de actividad) | ❌ Ausente | — | Pendiente de su fase. |
+| TB-33 | Campo de búsqueda con menú de ámbito (base actual, todas, grupo seleccionado) y opciones (ver §14) | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| TB-34 | Chat/Asistente IA | ❌ Ausente | — | Pendiente de su fase. |
+| TB-35 | Mostrar/ocultar inspector | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:446 | Control del panel disponible en barra, menú y paleta. |
+| TB-36 | Espacio flexible, espacio fijo y separador | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| TB-37 | Presentaciones de la barra: Icono y texto / Solo icono / Solo texto; tamaño pequeño. | ❌ Ausente | — | Pendiente de su fase. |
+| SB-01 | Bandeja de entrada global (Global Inbox) con contador de no leídos. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| SB-02 | Bases de datos abiertas, cada una desplegable mostrando: su Bandeja de entrada, árbol de grupos, Etiquetas, Papelera; indicador de sincronización, de cifrado y de base "solo lectura". | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| SB-03 | Favoritos: grupos, documentos, grupos inteligentes y búsquedas guardadas arrastrables. | ❌ Ausente | — | Pendiente de su fase. |
+| SB-04 | Etiquetas: árbol de etiquetas (las etiquetas pueden anidarse), por base y global; contador de elementos. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| SB-05 | Grupos inteligentes: globales y por base, con contadores; plantillas predefinidas (Todos los PDF, Imágenes, Abiertos recientemente, Añadidos recientemente, Marcados, No leídos, Duplicados, Recordatorios, Anotados…). | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| SB-06 | Reglas inteligentes: lista de reglas con indicador de activa/inactiva y botón para ejecutar. | ❌ Ausente | — | Pendiente de su fase. |
+| SB-07 | Recientes: documentos y grupos abiertos recientemente. | ❌ Ausente | — | Pendiente de su fase. |
+| SB-08 | Secciones plegables (y reordenables) con la cabecera en versalitas; menú contextual de cada sección para mostrar/ocultar secciones. | ❌ Ausente | — | Pendiente de su fase. |
+| SB-09 | Barra lateral de búsqueda: al buscar, la barra lateral cambia a modo búsqueda con ámbito, operadores y filtros (ver §14), y un botón para volver a Navegar. | ❌ Ausente | — | Pendiente de su fase. |
+| SB-10 | Arrastrar a cualquier grupo/base/etiqueta para mover, copiar, replicar o etiquetar. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| SB-11 | Botón "+" al pie: Nueva base de datos, Nuevo grupo, Nuevo grupo inteligente, Nueva regla inteligente, Nueva etiqueta, Abrir base de datos. | ❌ Ausente | — | Pendiente de su fase. |
+| IL-01 | Vista Iconos: miniaturas reales (primera página, imagen, captura web), tamaño ajustable con deslizador, nombre debajo, indicadores (no leído, marcado, etiqueta de color, réplica, bloqueado, recordatorio). | ❌ Ausente | — | Pendiente de su fase. |
+| IL-02 | Vista Lista: tabla con columnas configurables (clic derecho en la cabecera) — Nombre, Tipo, Tamaño, Fecha de creación, modificación, adición, apertura, Fecha del documento, Etiquetas, Etiqueta de color, Valoración, Marcador, Estado leído, Ubicación, Base, Autor, Título, URL, Comentario, Palabras, Caracteres, Páginas, Dimensiones, Duración, Anotaciones, Recordatorio, Puntuación (en búsqueda), Metadatos personalizados (cada campo como columna). Ordenación por cualquier columna, ascendente/descendente; ordenación secundaria; columnas redimensionables y reordenables. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| IL-03 | Vista Columnas: estilo navegador de columnas, con vista previa en la última columna. | ❌ Ausente | — | Pendiente de su fase. |
+| IL-04 | Vista Esquema/Agrupada: mostrar el contenido de los subgrupos con triángulos de despliegue. | ❌ Ausente | — | Pendiente de su fase. |
+| IL-05 | Ordenación manual (arrastrar para reordenar) además de por campos; "Ordenar por" en el menú Visualización. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| IL-06 | Edición en línea del nombre (Intro o clic lento). | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| IL-07 | Filtro rápido sobre la lista visible (campo de filtro en la cabecera de la lista). | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| IL-08 | Contador de elementos y selección en la barra de estado. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:536 | Recuento, selección y tipo. Resto de campos y tareas pendientes. |
+| IL-09 | Vista previa rápida (Espacio, como Quick Look). | 🟡 Parcial | Sources/ThinkBox/FilePreview.swift:4 | Quick Look y apertura externa según formato; sin visor especializado completo. |
+| IL-10 | Indicación visual de réplicas (nombre en cursiva o icono) y duplicados (color/indicador). | ❌ Ausente | — | Pendiente de su fase. |
+| IL-11 | Navegación completa con teclado (flechas, ⌘↑, ⌘↓ para abrir, ⌥ para alternar, letra inicial para saltar). | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| DV-01 | Texto plano y código: editor con números de línea opcionales, resaltado de sintaxis por extensión, ajuste de línea, mostrar invisibles, codificación y finales de línea, sangría con tabuladores/espacios. | 🟡 Parcial | Sources/ThinkBox/DocumentEditor.swift:10 | Markdown editable, metadatos básicos, recuento, enlaces y guardado automático. |
+| DV-02 | Texto enriquecido (RTF/RTFD): barra de formato (fuente, tamaño, negrita, cursiva, subrayado, tachado, color de texto y de resaltado, alineación, interlineado, listas, tablas, imágenes incrustadas, enlaces), estilos de párrafo, regla. | ❌ Ausente | — | Pendiente de su fase. |
+| DV-03 | Markdown: tres modos — Fuente, Previsualización y Fuente + Previsualización lado a lado, con conmutador en la cabecera; MultiMarkdown/CommonMark/GFM (tablas, notas al pie, listas de tareas, matemáticas con MathJax/KaTeX, metadatos YAML/MMD, transclusión {{archivo}}, enlaces wiki [[…]]); CSS de previsualización global y por documento; desplazamiento sincronizado; barra de formato Markdown. | 🟡 Parcial | Sources/ThinkBox/DocumentEditor.swift:10 | Markdown editable, metadatos básicos, recuento, enlaces y guardado automático. |
+| DV-04 | Nota con formato / HTML: editor WYSIWYG y vista de código fuente HTML, conmutables. | ❌ Ausente | — | Pendiente de su fase. |
+| DV-05 | PDF: visor con modos (una página, continua, dos páginas, miniaturas), zoom, rotar páginas, insertar/eliminar/reordenar/extraer páginas, dividir documento, búsqueda en el texto, capa de texto OCR, marcadores/índice del PDF en el panel de esquema; anotaciones: resaltar (colores), subrayar, tachar, notas adhesivas, cuadros de texto, dibujo libre, formas, flechas, sellos, enlaces, firma; resumen de anotaciones (exportable a Markdown/RTF); formularios PDF. | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| DV-06 | Imágenes: zoom, rotar, recortar, anotar, información EXIF, OCR. | 🟡 Parcial | Sources/ThinkBox/FilePreview.swift:4 | Quick Look y apertura externa según formato; sin visor especializado completo. |
+| DV-07 | Páginas web / marcadores / archivos web (webarchive): navegador integrado con barra de dirección, atrás/adelante, recargar, lector (modo lectura), capturar como PDF/Markdown/nota con formato/archivo web, abrir en navegador externo. | ❌ Ausente | — | Pendiente de su fase. |
+| DV-08 | Audio y vídeo: reproductor con controles, velocidad, capítulos, transcripción (ver §19). | 🟡 Parcial | Sources/ThinkBox/FilePreview.swift:4 | Quick Look y apertura externa según formato; sin visor especializado completo. |
+| DV-09 | Hojas de cálculo (Sheet/CSV/TSV): tabla editable con columnas tipadas, ordenar, añadir/eliminar filas y columnas, importar/exportar CSV. | 🟡 Parcial | Sources/ThinkBox/FilePreview.swift:4 | Quick Look y apertura externa según formato; sin visor especializado completo. |
+| DV-10 | Correo electrónico (.eml/.emlx): cabeceras, cuerpo, adjuntos extraíbles. | 🟡 Parcial | Sources/ThinkBox/FilePreview.swift:4 | Quick Look y apertura externa según formato; sin visor especializado completo. |
+| DV-11 | Documentos de Office/iWork: vista previa (Quick Look) y extracción de texto para indexación. | 🟡 Parcial | Sources/ThinkBox/FilePreview.swift:4 | Quick Look y apertura externa según formato; sin visor especializado completo. |
+| DV-12 | Grupos abiertos como documento: al seleccionar un grupo se muestra su contenido. | 🟡 Parcial | Sources/ThinkBox/DocumentEditor.swift:10 | Markdown editable, metadatos básicos, recuento, enlaces y guardado automático. |
+| DV-13 | Panel de esquema/índice del documento (títulos de Markdown/RTF, marcadores de PDF, miniaturas de páginas), plegable por gesto. | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| DV-14 | Buscar y reemplazar en el documento (⌘F) con mayúsculas/minúsculas, palabra completa, expresiones regulares; resaltado de coincidencias de la búsqueda global. | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| DV-15 | Dividir el visor en dos (horizontal/vertical) mostrando el mismo u otro documento. | ❌ Ausente | — | Pendiente de su fase. |
+| DV-16 | Modo lectura/enfoque y modo escritura sin distracciones (máquina de escribir: línea actual centrada). | ❌ Ausente | — | Pendiente de su fase. |
+| DV-17 | Recuento de palabras, caracteres, páginas y tiempo de lectura en la barra de estado. | 🟡 Parcial | Sources/ThinkBox/DocumentEditor.swift:10 | Markdown editable, metadatos básicos, recuento, enlaces y guardado automático. |
+| DV-18 | Guardado automático, indicador de cambios sin guardar, recuperación ante cierre inesperado. | 🟡 Parcial | Sources/ThinkBox/DocumentEditor.swift:10 | Markdown editable, metadatos básicos, recuento, enlaces y guardado automático. |
+| IN-01 | Información (General): nombre, alias, tipo, tamaño, ubicación (ruta en la base, clicable), URL, fechas (creación, modificación, adición, apertura, fecha del documento editable), autor/título (PDF), comentario, etiqueta de color, valoración, marcador, estado leído, bloqueado, excluir de (búsqueda, clasificación, etiquetado, ver también, enlaces wiki, chat/IA), número de réplicas y duplicados (clicables), ruta del archivo en disco (para indexados). | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:23 | Inspector independiente con datos básicos, estado, etiquetas, proyectos y enlaces entrantes/salientes; pendientes los campos avanzados. |
+| IN-02 | Metadatos personalizados: campos definidos en Preferencias (texto, número, decimal, fecha, booleano, conjunto de valores, URL, texto enriquecido), editables por documento y por lote. | ❌ Ausente | — | Pendiente de su fase. |
+| IN-03 | Etiquetas: campo de tokens con autocompletado, etiquetas sugeridas. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:23 | Inspector independiente con datos básicos, estado, etiquetas, proyectos y enlaces entrantes/salientes; pendientes los campos avanzados. |
+| IN-04 | Anotaciones y recordatorios: archivo de anotación vinculado (crear desde plantilla), lista de anotaciones/resaltados del PDF con navegación, recordatorio (fecha, repetición, alarma: notificación, correo, sonido, abrir documento, ejecutar script). | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| IN-05 | Documento → Propiedades: propiedades específicas del tipo (páginas, dimensiones, codificación, palabras, duración, metadatos PDF/EXIF). | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| IN-06 | Documento → Enlaces: enlaces entrantes (backlinks), salientes, enlaces de ítem, enlaces wiki, menciones no enlazadas (con botón "enlazar"). | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:23 | Inspector independiente con datos básicos, estado, etiquetas, proyectos y enlaces entrantes/salientes; pendientes los campos avanzados. |
+| IN-07 | Documento → Concordancia: lista y nube de palabras del documento con frecuencias; clic = buscar en el documento. | ❌ Ausente | — | Pendiente de su fase. |
+| IN-08 | Documento → Contenido/Esquema: índice del documento. | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| IN-09 | Ver también y Clasificar: documentos similares (IA) con puntuación; grupos sugeridos donde archivar, con botón "Mover"/"Replicar". | ❌ Ausente | — | Pendiente de su fase. |
+| IN-10 | Búsqueda (inspector de búsqueda en el documento actual con resultados en contexto). | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| IN-11 | Versiones: historial de versiones del documento con fecha, previsualización, comparar (diff) y restaurar. | ❌ Ausente | — | Pendiente de su fase. |
+| IN-12 | Chat/IA (ver §19). | ❌ Ausente | — | Pendiente de su fase. |
+| STB-01 | Barra de ruta (ubicación) clicable bajo la lista o el documento (equivalente a las migas de pan de §3). | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:446 | Ruta de biblioteca, proyecto/ámbito y documento encima del visor. Faltan los menús de hermanos y grupos anidados. |
+| STB-02 | Barra de estado inferior (22 px, estilo Cursor): base activa, número de elementos/seleccionados, estado de sincronización, progreso de tareas en segundo plano (indexación, OCR, importación) con clic para abrir el Registro de actividad, posición del cursor, palabras/caracteres, página X de Y en vista de página, codificación, tipo de documento, zoom. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:536 | Recuento, selección y tipo. Resto de campos y tareas pendientes. |
+| STB-03 | Ventana Actividad/Progreso con lista de tareas activas y botón de cancelar. | ❌ Ausente | — | Pendiente de su fase. |
+| MN-APP-01 | Acerca de | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-APP-02 | Preferencias/Ajustes… (⌘,) | ✅ Completa | Sources/ThinkBox/ThinkBoxApp.swift:14 | Validado en macOS en la versión anterior. |
+| MN-APP-03 | Instalar complementos/extensiones (extensiones de navegador, servicios, scripts) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-APP-04 | Servicios | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-APP-05 | Ocultar / Ocultar otros / Mostrar todo | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-APP-06 | Salir. | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-FILE-01 | Nueva ventana | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FILE-02 | Nueva pestaña | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:479 | Creación, cambio y cierre, con grupo, consulta, selección e historial por pestaña en la sesión. Pendientes reordenación, vista general y pestañas temporales. |
+| MN-FILE-03 | Nueva base de datos… (normal, cifrada con tamaño máximo) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FILE-04 | Abrir base de datos… | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FILE-05 | Bases de datos recientes ▸ | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FILE-06 | Cerrar pestaña / Cerrar ventana / Cerrar base de datos | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:479 | Creación, cambio y cierre, con grupo, consulta, selección e historial por pestaña en la sesión. Pendientes reordenación, vista general y pestañas temporales. |
+| MN-FILE-07 | Guardar / Guardar versión / Revertir a… | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FILE-08 | Importar ▸ (Archivos y carpetas…, Imágenes con OCR…, Correos de Mail/Outlook…, Notas, Contactos, Marcadores del navegador, Feeds RSS, Archivo de otra base) | 🟡 Parcial | Sources/ThinkBox/LibraryFiles.swift:19 | Importación y exportación individuales. Sin indexado externo ni estructura de carpetas. |
+| MN-FILE-09 | Indexar archivos y carpetas… | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FILE-10 | Exportar ▸ (Archivos y carpetas…, Como sitio web…, Como archivo de base de datos…, Metadatos a CSV/JSON…, Listado de documentos…, Resumen de anotaciones…) | 🟡 Parcial | Sources/ThinkBox/LibraryFiles.swift:19 | Importación y exportación individuales. Sin indexado externo ni estructura de carpetas. |
+| MN-FILE-11 | Abrir con ▸ / Abrir externamente | 🟡 Parcial | Sources/ThinkBox/FilePreview.swift:4 | Quick Look y apertura externa según formato; sin visor especializado completo. |
+| MN-FILE-12 | Mostrar en Finder | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FILE-13 | Compartir ▸ | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FILE-14 | Configurar página… | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FILE-15 | Imprimir… (respeta la vista de página) | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| MN-FILE-16 | Exportar como PDF… | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FILE-17 | Propiedades de la base de datos… (nombre, comentario, cifrado, excluir de sincronización, enlaces wiki, ordenación, icono). | ❌ Ausente | — | Pendiente de su fase. |
+| MN-EDIT-01 | Deshacer / Rehacer | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-EDIT-02 | Cortar / Copiar / Pegar / Pegar y adaptar estilo / Eliminar / Seleccionar todo / Anular selección | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-EDIT-03 | Copiar enlace del ítem (URL x-…-item://UUID propia de la app) y Copiar enlace con nombre (Markdown) | 🟡 Parcial | Sources/ThinkBox/DocumentEditor.swift:10 | Markdown editable, metadatos básicos, recuento, enlaces y guardado automático. |
+| MN-EDIT-04 | Duplicar | ❌ Ausente | — | Pendiente de su fase. |
+| MN-EDIT-05 | Buscar ▸ (Buscar…, Buscar y reemplazar…, Siguiente, Anterior, Usar selección para buscar, Ir a la selección) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-EDIT-06 | Ortografía y gramática ▸ | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-EDIT-07 | Sustituciones ▸ (comillas, guiones, enlaces, texto) | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-EDIT-08 | Transformaciones ▸ (mayúsculas, minúsculas, capitalizar) | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-EDIT-09 | Voz ▸ | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-EDIT-10 | Insertar ▸ (fecha, hora, fecha y hora, enlace, enlace wiki, imagen, tabla, salto de página, plantilla de texto, separador) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-EDIT-11 | Emoji y símbolos. | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-DATA-01 | Nuevo ▸ (Grupo, Texto plano, Texto enriquecido, Markdown, Nota con formato, Página HTML, Marcador, Hoja, Desde plantilla ▸, Con contenido del portapapeles) | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| MN-DATA-02 | Nuevo grupo con selección | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-03 | Nuevo grupo inteligente… / Nueva regla inteligente… | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| MN-DATA-04 | Plantillas ▸ (aplicar, mostrar carpeta, gestionar) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-05 | Mover a ▸ / Replicar a ▸ / Duplicar a ▸ (selector con búsqueda de grupos) | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| MN-DATA-06 | Mover a la papelera | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| MN-DATA-07 | Fusionar (texto/RTF/PDF) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-08 | Dividir documento (por páginas, por marcadores) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-09 | Agrupar elementos / Desagrupar | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-10 | Convertir ▸ (a texto plano, texto enriquecido, Markdown, nota con formato, HTML, PDF, PDF paginado, PDF con búsqueda, archivo web, marcador) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-11 | OCR ▸ (a PDF con búsqueda, a texto enriquecido, a Word, a Markdown; idiomas) | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| MN-DATA-12 | Etiquetas ▸ (Convertir grupos en etiquetas, Convertir etiquetas en grupos, Combinar etiquetas) | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| MN-DATA-13 | Etiqueta de color ▸ (7 + ninguna) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-14 | Valoración ▸ (0–5) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-15 | Marcar ▸ (Leído, No leído, Marcado, Bloqueado) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-16 | Recordatorio ▸ | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-17 | Excluir de ▸ (Búsqueda, Clasificación, Etiquetado, Ver también, Enlaces wiki, Chat/IA, Sincronización) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-18 | Renombrar… / Renombrar por lotes con marcadores de posición | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| MN-DATA-19 | Procesar por lotes… | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-20 | Anotaciones ▸ (Crear archivo de anotación, Resumir resaltados, Exportar anotaciones) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-21 | Actualizar elementos indexados | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-22 | Mover a la base de datos (convertir indexado en importado) / Mover a carpeta externa (convertir importado en indexado) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-23 | Mostrar réplicas / Mostrar duplicados | ❌ Ausente | — | Pendiente de su fase. |
+| MN-DATA-24 | Información (abre el inspector en Información). | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FMT-01 | Fuente ▸ (Mostrar fuentes, Negrita, Cursiva, Subrayado, Tachado, Mayor, Menor, Colores, Resaltado ▸ colores) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FMT-02 | Texto ▸ (alinear izquierda/centro/derecha/justificar, dirección de escritura, mostrar regla, copiar/pegar regla) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FMT-03 | Estilos ▸ (Título 1–6, Cuerpo, Cita, Código, Personalizar estilos) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FMT-04 | Listas ▸ (viñetas, numerada, tareas; aumentar/reducir sangría) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FMT-05 | Tabla ▸ (insertar, filas/columnas, combinar celdas) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FMT-06 | Markdown ▸ (negrita, cursiva, código, bloque de código, enlace, imagen, nota al pie, cita, regla horizontal, tabla, casilla de tarea) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FMT-07 | Interlineado y espaciado de párrafo | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FMT-08 | Insertar salto de página | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FMT-09 | Configurar página… (§4.B) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FMT-10 | Hacer texto plano / Hacer texto enriquecido | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FMT-11 | Ajuste de línea | ❌ Ausente | — | Pendiente de su fase. |
+| MN-FMT-12 | Hoja de estilos CSS del documento (Markdown/HTML). | ❌ Ausente | — | Pendiente de su fase. |
+| MN-VIEW-01 | Como Iconos / Como Lista / Como Columnas | ❌ Ausente | — | Pendiente de su fase. |
+| MN-VIEW-02 | Disposición ▸ (Pantalla ancha, División vertical, Sin vista previa) | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:416 | Cuatro disposiciones con selección conservada. Se guarda por escena y por proyecto, y se conservan los controles nativos de pantalla completa. |
+| MN-VIEW-03 | Mostrar/Ocultar ▸ (Barra lateral, Lista de elementos, Inspector, Barra de herramientas, Barra de pestañas, Barra de ruta, Barra de estado, Esquema del documento, Chat) | 🟡 Parcial | Sources/ThinkBox/WorkspaceLayout.swift:37 | Divisores de 1 pt, zona de 6 pt, arrastre y doble clic. Paneles accesibles por barra, menú y paleta. El gesto de trackpad y la persistencia por pestaña y espacio de trabajo siguen pendientes. |
+| MN-VIEW-04 | Ordenar por ▸ (todos los campos + Manual, ascendente/descendente) | 🟡 Parcial | Sources/ThinkBox/SettingsView.swift:4 | Opciones de apariencia, lista, editor y lectura disponibles en Ajustes. |
+| MN-VIEW-05 | Columnas ▸ | ❌ Ausente | — | Pendiente de su fase. |
+| MN-VIEW-06 | Opciones de vista… (tamaño de iconos, mostrar extensiones, mostrar contenido de subgrupos) | 🟡 Parcial | Sources/ThinkBox/SettingsView.swift:4 | Opciones de apariencia, lista, editor y lectura disponibles en Ajustes. |
+| MN-VIEW-07 | Markdown ▸ (Fuente, Previsualización, Lado a lado, Desplazamiento sincronizado) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-VIEW-08 | Vista de página ▸ (Editor, Previsualización, Ambos, Ninguno, Una página / Dos páginas / Continuo, Mostrar reglas) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-VIEW-09 | Zoom ▸ (Ampliar, Reducir, Tamaño real, Ajustar al ancho, Ajustar a la página) | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| MN-VIEW-10 | PDF ▸ (Una página, Continua, Dos páginas, Miniaturas, Rotar) | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| MN-VIEW-11 | Números de línea / Invisibles / Ajuste de línea | 🟡 Parcial | Sources/ThinkBox/DocumentEditor.swift:10 | Markdown editable, metadatos básicos, recuento, enlaces y guardado automático. |
+| MN-VIEW-12 | Modo enfoque / Escritura sin distracciones | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:416 | Cuatro disposiciones con selección conservada. Se guarda por escena y por proyecto, y se conservan los controles nativos de pantalla completa. |
+| MN-VIEW-13 | Apariencia ▸ (Oscuro, Claro, Sistema) | 🟡 Parcial | Sources/ThinkBox/SettingsView.swift:4 | Opciones de apariencia, lista, editor y lectura disponibles en Ajustes. |
+| MN-VIEW-14 | Personalizar barra de herramientas… | ❌ Ausente | — | Pendiente de su fase. |
+| MN-VIEW-15 | Pantalla completa. | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-GO-01 | Atrás / Adelante | 🟡 Parcial | Sources/WritingLibrary/NavigationHistory.swift:1 | Historial detrás y delante por pestaña; los cambios de rama están cubiertos por prueba. Subir al grupo contenedor requiere jerarquía de grupos. |
+| MN-GO-02 | Grupo contenedor | ❌ Ausente | — | Pendiente de su fase. |
+| MN-GO-03 | Raíz de la base | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| MN-GO-04 | Bandeja de entrada / Bandeja global | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| MN-GO-05 | Etiquetas | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| MN-GO-06 | Papelera | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| MN-GO-07 | Favoritos ▸ | ❌ Ausente | — | Pendiente de su fase. |
+| MN-GO-08 | Recientes ▸ | ❌ Ausente | — | Pendiente de su fase. |
+| MN-GO-09 | Documento siguiente / anterior | ❌ Ausente | — | Pendiente de su fase. |
+| MN-GO-10 | Siguiente / anterior no leído | ❌ Ausente | — | Pendiente de su fase. |
+| MN-GO-11 | Siguiente / anterior coincidencia de búsqueda | ❌ Ausente | — | Pendiente de su fase. |
+| MN-GO-12 | Ir a página… | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| MN-GO-13 | Ir a… (⌘P) | ✅ Completa | Sources/ThinkBox/LibraryCommands.swift:62; Sources/ThinkBox/LibraryView.swift:97 | Ir a abre documentos y proyectos de la biblioteca actual desde el menú Ir y ⌘P. |
+| MN-GO-14 | Ir a la base ▸ (lista de bases abiertas). | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-01 | Buscar (barra lateral de búsqueda, ⌘⌥F o equivalente) | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| MN-TOOLS-02 | Búsquedas guardadas ▸ | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| MN-TOOLS-03 | Clasificar | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-04 | Ver también | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-05 | Chat/Asistente ▸ (nuevo chat, preguntar sobre selección, resumir, extraer, traducir) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-06 | Resumir ▸ (documentos, resaltados, menciones) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-07 | Transcribir (audio/vídeo/imagen) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-08 | Concordancia | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-09 | Procesar por lotes… | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-10 | Capturar ▸ (desde portapapeles, desde página web, captura de pantalla) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-11 | Gestor de descargas | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-12 | Feeds | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-13 | Sincronizar ahora / Estado de sincronización | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-14 | Mantenimiento de la base ▸ (Verificar y reparar, Comprobar integridad de archivos, Reconstruir, Optimizar, Copia de seguridad y optimizar, Vaciar papelera) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-15 | Registro (Log) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-16 | Scripts ▸ (menú de scripts del usuario, abrir carpeta de scripts) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-TOOLS-17 | Paleta de comandos. | ✅ Completa | Sources/ThinkBox/LibraryCommands.swift:62 | Paleta en Herramientas, botón del menú de biblioteca y ⇧⌘P. |
+| MN-WIN-01 | Minimizar / Zoom / Ajustar a la izquierda/derecha | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-WIN-02 | Pestaña siguiente / anterior | ❌ Ausente | — | Pendiente de su fase. |
+| MN-WIN-03 | Mover pestaña a ventana nueva / Combinar todas las ventanas | ❌ Ausente | — | Pendiente de su fase. |
+| MN-WIN-04 | Vista general de pestañas | ❌ Ausente | — | Pendiente de su fase. |
+| MN-WIN-05 | Espacios de trabajo ▸ (Guardar…, lista, Gestionar…) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-WIN-06 | Paneles ▸ (Bandeja global, Sorter, Actividad, Registro, Gestor de descargas) | ❌ Ausente | — | Pendiente de su fase. |
+| MN-WIN-07 | Traer todo al frente | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-WIN-08 | Lista de ventanas abiertas. | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-HELP-01 | Buscar en menús | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| MN-HELP-02 | Manual | ❌ Ausente | — | Pendiente de su fase. |
+| MN-HELP-03 | Atajos de teclado | ❌ Ausente | — | Pendiente de su fase. |
+| MN-HELP-04 | Sintaxis de búsqueda | ❌ Ausente | — | Pendiente de su fase. |
+| MN-HELP-05 | Novedades | ❌ Ausente | — | Pendiente de su fase. |
+| MN-HELP-06 | Informar de un error / Exportar diagnóstico. | ❌ Ausente | — | Pendiente de su fase. |
+| CX-01 | Sobre elementos de la lista: Abrir, Abrir en pestaña nueva, Abrir en ventana nueva, Abrir con ▸, Vista rápida, Mostrar en Finder, Copiar enlace del ítem, Renombrar, Duplicar, Replicar a ▸, Mover a ▸, Agrupar, Fusionar, Convertir ▸, OCR ▸, Etiqueta de color ▸, Valoración ▸, Marcar ▸, Etiquetas…, Recordatorio…, Excluir de ▸, Compartir ▸, Exportar…, Imprimir, Información, Mover a la papelera. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| CX-02 | Sobre grupos/bases en la barra lateral: Nuevo ▸, Nuevo grupo, Abrir en pestaña nueva, Añadir a Favoritos, Expandir/contraer todo, Propiedades de la base, Sincronizar, Cerrar base, Mostrar en Finder, Ordenar ▸. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:97 | Navegación y resultados comparten barra. Menús y operaciones disponibles en parte. |
+| CX-03 | En el editor de texto: Cortar/Copiar/Pegar, Buscar en la app/la web, Crear enlace wiki desde selección, Nuevo documento desde selección, Copiar como Markdown, Resaltar, Añadir anotación, Preguntar a la IA sobre la selección, Ortografía, Insertar ▸, Vista de página ▸, Formato ▸. | 🟡 Parcial | Sources/ThinkBox/DocumentEditor.swift:10 | Markdown editable, metadatos básicos, recuento, enlaces y guardado automático. |
+| CX-04 | En PDF: herramientas de anotación, copiar texto/imagen, crear documento desde selección, buscar, rotar página, eliminar página, extraer página. | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| CX-05 | En la cabecera de columnas: mostrar/ocultar cada columna, restablecer. | ❌ Ausente | — | Pendiente de su fase. |
+| CX-06 | En pestañas: Cerrar, Cerrar otras, Cerrar a la derecha, Fijar, Mover a ventana nueva, Copiar enlace. | 🟡 Parcial | Sources/ThinkBox/LibraryView.swift:479 | Creación, cambio y cierre, con grupo, consulta, selección e historial por pestaña en la sesión. Pendientes reordenación, vista general y pestañas temporales. |
+| CX-07 | En la barra de herramientas: Personalizar…, Icono y texto/Solo icono/Solo texto. | ❌ Ausente | — | Pendiente de su fase. |
+| DB-01 | Múltiples bases abiertas simultáneamente; cada una es un paquete en disco con sus archivos y metadatos (no modificar desde fuera). | ❌ Ausente | — | Pendiente de su fase. |
+| DB-02 | Documentos importados (copiados dentro de la base) e indexados (referenciados en una carpeta externa, con vigilancia de cambios en disco). | 🟡 Parcial | Sources/ThinkBox/LibraryFiles.swift:19 | Importación y exportación individuales. Sin indexado externo ni estructura de carpetas. |
+| DB-03 | Réplicas: un mismo documento en varios grupos (no es copia); eliminar una réplica no borra el original mientras quede otra. | ✅ Completa | Tests/WritingLibraryTests/WritingLibraryTests.swift | Flujo y persistencia en una biblioteca. |
+| DB-04 | Duplicados: detección por contenido; marcado visual; grupo inteligente de duplicados. | ❌ Ausente | — | Pendiente de su fase. |
+| DB-05 | Etiquetas como grupos especiales; etiquetas anidadas; opción por base de "los grupos actúan como etiquetas". | 🟡 Parcial | Sources/WritingLibrary/Tags.swift:105 | Jerarquía de etiquetas y herencia. El árbol usa control nativo de despliegue. |
+| DB-06 | Papelera por base con restaurar y vaciar. | 🟡 Parcial | Sources/WritingLibrary/WritingLibrary.swift:91 | Modelo local con papelera, búsqueda en memoria, enlaces y persistencia atómica. |
+| DB-07 | UUID permanente por elemento y esquema de URL propio para enlaces de ítem (abrir, revelar, ir a página, ir a texto). | 🟡 Parcial | Sources/WritingLibrary/WritingLibrary.swift:91 | Modelo local con papelera, búsqueda en memoria, enlaces y persistencia atómica. |
+| DB-08 | Cifrado de bases (AES-256) con contraseña y almacenamiento opcional en el llavero. | ❌ Ausente | — | Pendiente de su fase. |
+| DB-09 | Copias de seguridad internas automáticas (instantáneas de metadatos) y "Copia de seguridad y optimizar"; exportar archivo de base (zip). | ❌ Ausente | — | Pendiente de su fase. |
+| DB-10 | Versionado de documentos (ver §9 Versiones) con política de retención configurable. | ❌ Ausente | — | Pendiente de su fase. |
+| DB-11 | Verificar y reparar, comprobación de integridad (hash de archivos), reconstrucción. | ❌ Ausente | — | Pendiente de su fase. |
+| DB-12 | Bloqueo de documentos (solo lectura) y bases de solo lectura. | ❌ Ausente | — | Pendiente de su fase. |
+| SR-01 | Búsqueda de texto completo instantánea en todas las bases abiertas, con índice persistente e incremental. | 🟡 Parcial | Sources/WritingLibrary/WritingLibrary.swift:91 | Modelo local con papelera, búsqueda en memoria, enlaces y persistencia atómica. |
+| SR-02 | Operadores: AND, OR, NOT, XOR, paréntesis, frase exacta "…", comodines * y ?, NEAR, NEAR/n, BEFORE, AFTER, NEXT, búsqueda difusa ~. | 🟡 Parcial | Sources/WritingLibrary/WritingLibrary.swift:91 | Modelo local con papelera, búsqueda en memoria, enlaces y persistencia atómica. |
+| SR-03 | Prefijos de campo: name:, content:, comment:, tags:, kind:, label:, rating:, flag:, unread:, url:, author:, title:, created:, modified:, added:, opened:, date:, size:, pages:, words:, annotation:, mdcampo: (metadatos personalizados), con comparadores (>, <, >=, <=, rangos, fechas relativas: hoy, ayer, semana, mes, -7d). | 🟡 Parcial | Sources/WritingLibrary/WritingLibrary.swift:91 | Modelo local con papelera, búsqueda en memoria, enlaces y persistencia atómica. |
+| SR-04 | Opciones del campo de búsqueda: ámbito (Todas las bases / Base actual / Grupo seleccionado), modo (Todas las palabras / Cualquier palabra / Frase / Difusa / Booleano), distinguir mayúsculas, diacríticos, campos donde buscar. | 🟡 Parcial | Sources/WritingLibrary/WritingLibrary.swift:91 | Modelo local con papelera, búsqueda en memoria, enlaces y persistencia atómica. |
+| SR-05 | Filtros rápidos en la barra lateral de búsqueda: tipo de documento, fecha, etiqueta de color, etiqueta, no leído, marcado, anotado. | ❌ Ausente | — | Pendiente de su fase. |
+| SR-06 | Resultados con puntuación de relevancia (columna), fragmento con coincidencias resaltadas, contador; al abrir, salto a la primera coincidencia con navegación siguiente/anterior. | ❌ Ausente | — | Pendiente de su fase. |
+| SR-07 | Guardar búsqueda como grupo inteligente. | ✅ Completa | Sources/ThinkBox/LibraryView.swift:97; Tests/WritingLibraryTests/WritingLibraryTests.swift | Consulta persistente y evaluada dinámicamente en la biblioteca actual. |
+| SR-08 | Historial de búsquedas recientes. | ❌ Ausente | — | Pendiente de su fase. |
+| SR-09 | Búsqueda dentro de PDF con OCR, imágenes con OCR y transcripciones. | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| SM-01 | Grupos inteligentes: editor de condiciones (todas/cualquiera, anidables) sobre cualquier propiedad, contenido o metadato; ámbito (base, grupo, todas); ordenación propia; icono; contador opcional. | 🟡 Parcial | Sources/WritingLibrary/WritingLibrary.swift:91 | Modelo local con papelera, búsqueda en memoria, enlaces y persistencia atómica. |
+| SM-02 | Reglas inteligentes: condiciones (igual que grupos inteligentes) + disparadores: Bajo demanda, Cada hora/día/semana, Al iniciar, Antes/Después de sincronizar, Al importar, Al capturar, Al crear, Al abrir, Al guardar, Al renombrar, Al mover, Al clasificar, Al etiquetar, Al marcar/etiquetar con color/valorar, Al convertir, Tras OCR, Al añadir recordatorio, Al mover a la papelera. | ❌ Ausente | — | Pendiente de su fase. |
+| SM-03 | Acciones (encadenables, en orden): Mover, Replicar, Duplicar, Clasificar, Convertir, OCR, Comprimir PDF, Cambiar nombre (con marcadores de posición y expresiones regulares), Cambiar comentario, Asignar etiqueta de color, Valoración, Marcador, Añadir/quitar/establecer etiquetas, Establecer metadatos personalizados, Extraer datos del contenido (fechas, importes, números) con patrones, Marcar leído/no leído, Bloquear, Excluir de…, Exportar, Mover a la papelera, Ejecutar script (interno o externo), Consulta a la IA (resumir, etiquetar, extraer), Mostrar notificación, Reproducir sonido, Escribir en el registro, Esperar, Detener. | ❌ Ausente | — | Pendiente de su fase. |
+| SM-04 | Marcadores de posición para nombres y metadatos: fecha actual, fecha del documento, nombre, extensión, tipo, grupo, base, contador, campos de metadatos, texto extraído, expresiones regulares. | ❌ Ausente | — | Pendiente de su fase. |
+| SM-05 | Ejecutar regla manualmente sobre la selección; vista previa de elementos afectados; registro de ejecuciones. | ❌ Ausente | — | Pendiente de su fase. |
+| CP-01 | Importar archivos y carpetas conservando estructura; arrastrar desde Finder; importación con OCR automático según preferencias. | 🟡 Parcial | Sources/ThinkBox/LibraryFiles.swift:19 | Importación y exportación individuales. Sin indexado externo ni estructura de carpetas. |
+| CP-02 | Sorter: panel flotante/menú de la barra de menús siempre disponible para soltar archivos, texto, URLs, tomar notas rápidas y elegir destino (base, grupo, etiquetas). | ❌ Ausente | — | Pendiente de su fase. |
+| CP-03 | Extensiones de navegador / Clip: capturar URL como marcador, página como PDF (una página continua o paginado), archivo web, Markdown limpio (modo lectura), nota con formato, texto seleccionado; elegir destino, etiquetas y comentario. | ❌ Ausente | — | Pendiente de su fase. |
+| CP-04 | Servicio del sistema y menú Compartir para enviar contenido desde otras apps. | ❌ Ausente | — | Pendiente de su fase. |
+| CP-05 | Importación de correo (Mail/Outlook), con adjuntos y metadatos. | ❌ Ausente | — | Pendiente de su fase. |
+| CP-06 | Carpetas vigiladas / bandeja de importación automática en disco. | ❌ Ausente | — | Pendiente de su fase. |
+| CP-07 | Escáner: importar desde escáner/cámara con OCR. | ❌ Ausente | — | Pendiente de su fase. |
+| CP-08 | Feeds RSS/Atom como grupos con elementos. | ❌ Ausente | — | Pendiente de su fase. |
+| CP-09 | Gestor de descargas con cola y opciones de destino. | ❌ Ausente | — | Pendiente de su fase. |
+| CP-10 | Nueva nota desde portapapeles con detección del tipo. | ❌ Ausente | — | Pendiente de su fase. |
+| LK-01 | Enlaces de ítem entre documentos (copiar enlace y pegar en cualquier documento o app externa). | ✅ Completa | Tests/WritingLibraryTests/WritingLibraryTests.swift | Flujo y persistencia en una biblioteca. |
+| LK-02 | Enlaces wiki [[Nombre]] y [[Nombre\|alias]], con autocompletado al escribir [[; creación del documento si no existe; opción de enlazado wiki automático (por nombre, alias o ambos; mayúsculas sensibles o no). | ❌ Ausente | — | Pendiente de su fase. |
+| LK-03 | Backlinks y menciones no enlazadas en el inspector. | 🟡 Parcial | Sources/ThinkBox/DocumentEditor.swift:10 | Markdown editable, metadatos básicos, recuento, enlaces y guardado automático. |
+| LK-04 | Alias por documento. | ❌ Ausente | — | Pendiente de su fase. |
+| LK-05 | Enlaces a página concreta de PDF, a texto concreto y a posición temporal de audio/vídeo. | 🟡 Parcial | Sources/ThinkBox/PDFReader.swift:7 | Navegación, marcado, extracción de página y OCR de PDF para el índice local. |
+| LK-06 | Transclusión en Markdown. | ❌ Ausente | — | Pendiente de su fase. |
+| MD-01 | 7 etiquetas de color con nombres editables | ❌ Ausente | — | Pendiente de su fase. |
+| MD-02 | valoración 0–5 | ❌ Ausente | — | Pendiente de su fase. |
+| MD-03 | marcador | ❌ Ausente | — | Pendiente de su fase. |
+| MD-04 | leído/no leído (automático al abrir, configurable) | ❌ Ausente | — | Pendiente de su fase. |
+| MD-05 | comentarios | ❌ Ausente | — | Pendiente de su fase. |
+| MD-06 | etiquetas (tags) | ✅ Completa | Tests/WritingLibraryTests/WritingLibraryTests.swift | Flujo y persistencia en una biblioteca. |
+| MD-07 | metadatos personalizados con tipos | ❌ Ausente | — | Pendiente de su fase. |
+| MD-08 | recordatorios con alarmas y repetición | ❌ Ausente | — | Pendiente de su fase. |
+| MD-09 | iconos personalizados para grupos/documentos | ❌ Ausente | — | Pendiente de su fase. |
+| MD-10 | fecha del documento detectada automáticamente desde el contenido | ❌ Ausente | — | Pendiente de su fase. |
+| MD-11 | edición de metadatos por lotes. | ❌ Ausente | — | Pendiente de su fase. |
+| AI-01 | Clasificar: sugerencias de grupo destino basadas en el contenido y en lo ya archivado; aprendizaje continuo. | ❌ Ausente | — | Pendiente de su fase. |
+| AI-02 | Ver también: documentos similares en todas las bases. | ❌ Ausente | — | Pendiente de su fase. |
+| AI-03 | Concordancia y palabras clave. | ❌ Ausente | — | Pendiente de su fase. |
+| AI-04 | Etiquetado automático sugerido. | ❌ Ausente | — | Pendiente de su fase. |
+| AI-05 | Chat/Asistente en panel lateral (estilo panel de chat de Cursor): conversación sobre el documento actual, la selección, un grupo o búsquedas; respuestas con citas enlazadas a los documentos; acciones (crear documento con la respuesta, añadir etiquetas, renombrar, resumir). | ❌ Ausente | — | Pendiente de su fase. |
+| AI-06 | Proveedores configurables (Anthropic Claude, OpenAI, Google, modelos locales vía Ollama/LM Studio), clave API guardada en el llavero, selección de modelo, límite de coste/uso, opción de procesamiento solo local. | ❌ Ausente | — | Pendiente de su fase. |
+| AI-07 | Resumir documentos, resaltados y menciones; traducir; extraer datos a metadatos; transcribir audio/vídeo; describir imágenes. | ❌ Ausente | — | Pendiente de su fase. |
+| AI-08 | Respetar Excluir de Chat/IA a nivel de documento y de base: nunca se envía ese contenido. | ❌ Ausente | — | Pendiente de su fase. |
+| SY-01 | Sincronización entre equipos mediante: red local (Bonjour), carpeta local/externa, WebDAV, Dropbox, iCloud (CloudKit) y servidor propio. | ❌ Ausente | — | Pendiente de su fase. |
+| SY-02 | Cifrado de extremo a extremo de la sincronización con contraseña de sincronización. | ❌ Ausente | — | Pendiente de su fase. |
+| SY-03 | Ajustes por base (qué ubicaciones sincroniza, sincronizar al abrir/cerrar, intervalo). | ❌ Ausente | — | Pendiente de su fase. |
+| SY-04 | Resolución de conflictos (conservar ambos como versiones; revisar en el inspector Versiones). | ❌ Ausente | — | Pendiente de su fase. |
+| SY-05 | Indicadores y registro de sincronización; botón Sincronizar ahora. | ❌ Ausente | — | Pendiente de su fase. |
+| SY-06 | Compatibilidad con app móvil futura (formato de almacén documentado). | ❌ Ausente | — | Pendiente de su fase. |
+| AU-01 | Diccionario de scripting (AppleScript/JXA en nativo; API de scripts JavaScript en Electron) que exponga bases, grupos, documentos, búsquedas y comandos. | ❌ Ausente | — | Pendiente de su fase. |
+| AU-02 | Menú de Scripts con carpeta del usuario; scripts asignables a atajos y a la barra de herramientas. | ❌ Ausente | — | Pendiente de su fase. |
+| AU-03 | Esquema de URL para abrir/crear/buscar desde otras apps. | 🟡 Parcial | Sources/WritingLibrary/WritingLibrary.swift:91 | Modelo local con papelera, búsqueda en memoria, enlaces y persistencia atómica. |
+| AU-04 | Procesar por lotes: renombrar con patrones, buscar y reemplazar en nombres/contenido, cambiar metadatos, convertir, OCR, mover. | ❌ Ausente | — | Pendiente de su fase. |
+| AU-05 | Plantillas de documentos y de estructuras de grupos (con marcadores de posición, p. ej. fecha, cursor inicial). | ❌ Ausente | — | Pendiente de su fase. |
+| AU-06 | Integración con Atajos de macOS (acciones de App Intents) si la plataforma lo permite. | ❌ Ausente | — | Pendiente de su fase. |
+| AU-07 | Servidor MCP opcional para que agentes de IA externos operen sobre las bases (con exclusiones respetadas). | ❌ Ausente | — | Pendiente de su fase. |
+| PR-01 | General: apariencia, idioma, mostrar en barra de menús/Dock, restaurar ventanas al abrir, comportamiento de pestañas, abrir documentos con doble clic/un clic. | 🟡 Parcial | Sources/ThinkBox/SettingsView.swift:4 | Opciones de apariencia, lista, editor y lectura disponibles en Ajustes. |
+| PR-02 | Gestos (§4.A, GS-09). | ❌ Ausente | — | Pendiente de su fase. |
+| PR-03 | Edición: fuente por defecto de texto plano/RTF, ajuste de línea, autocorrección, comillas tipográficas, tabulación, guardar automáticamente, enlaces wiki (modo, alias, mayúsculas). | 🟡 Parcial | Sources/ThinkBox/DocumentEditor.swift:10 | Markdown editable, metadatos básicos, recuento, enlaces y guardado automático. |
+| PR-04 | Markdown: sintaxis, CSS por defecto, matemáticas, resaltado de código, modo por defecto (fuente/previsualización/lado a lado). | ❌ Ausente | — | Pendiente de su fase. |
+| PR-05 | Vista de página (§4.B): activación por defecto por tipo (editor y previsualización por separado), tamaño de página, márgenes, encabezado y pie por defecto, papel blanco/oscuro. | ❌ Ausente | — | Pendiente de su fase. |
+| PR-06 | Importación: destino por defecto (bandeja global o base actual), OCR automático, convertir correos, conservar estructura. | ❌ Ausente | — | Pendiente de su fase. |
+| PR-07 | OCR: idiomas, resolución, calidad, comprimir PDF, conservar original. | ❌ Ausente | — | Pendiente de su fase. |
+| PR-08 | Web/Captura: formato por defecto de captura, modo lectura, bloqueo de anuncios, agente de usuario. | ❌ Ausente | — | Pendiente de su fase. |
+| PR-09 | Búsqueda e índice: idiomas, palabras vacías, tamaño de índice, reconstruir índice. | ❌ Ausente | — | Pendiente de su fase. |
+| PR-10 | Metadatos personalizados: crear/editar/borrar campos y tipos. | ❌ Ausente | — | Pendiente de su fase. |
+| PR-11 | Etiquetas de color: nombres y colores. | ❌ Ausente | — | Pendiente de su fase. |
+| PR-12 | Recordatorios y notificaciones. | ❌ Ausente | — | Pendiente de su fase. |
+| PR-13 | Sincronización: ubicaciones y credenciales. | ❌ Ausente | — | Pendiente de su fase. |
+| PR-14 | IA: proveedores, modelos, claves, privacidad, límites. | ❌ Ausente | — | Pendiente de su fase. |
+| PR-15 | Copias de seguridad y versiones: frecuencia, retención. | ❌ Ausente | — | Pendiente de su fase. |
+| PR-16 | Atajos de teclado: editor de atajos con búsqueda, detección de conflictos, importar/exportar (estilo editor de atajos de Cursor/VS Code). | ❌ Ausente | — | Pendiente de su fase. |
+| PR-17 | Temas: selección, editor de tokens, importar/exportar. | 🟡 Parcial | Sources/ThinkBox/SettingsView.swift:4 | Opciones de apariencia, lista, editor y lectura disponibles en Ajustes. |
+| PR-18 | Avanzado: registro de depuración, restablecer ajustes, ubicación de carpetas de soporte. | 🟡 Parcial | Sources/ThinkBox/SettingsView.swift:4 | Opciones de apariencia, lista, editor y lectura disponibles en Ajustes. |
+| AX-01 | Ventana de documento independiente | 🟡 Parcial | Sources/ThinkBox/StandaloneDocument.swift:4 | Ventana editable dedicada con los paneles emergentes existentes. |
+| AX-02 | Sorter | ❌ Ausente | — | Pendiente de su fase. |
+| AX-03 | Panel de Bandeja global | ❌ Ausente | — | Pendiente de su fase. |
+| AX-04 | Registro (Log) con filtros y exportación | ❌ Ausente | — | Pendiente de su fase. |
+| AX-05 | Actividad/Progreso | ❌ Ausente | — | Pendiente de su fase. |
+| AX-06 | Gestor de descargas | ❌ Ausente | — | Pendiente de su fase. |
+| AX-07 | Selector de grupo "Mover/Replicar a…" con búsqueda y recientes | ❌ Ausente | — | Pendiente de su fase. |
+| AX-08 | Editor de grupos inteligentes | ❌ Ausente | — | Pendiente de su fase. |
+| AX-09 | Editor de reglas inteligentes | ❌ Ausente | — | Pendiente de su fase. |
+| AX-10 | Procesar por lotes | ❌ Ausente | — | Pendiente de su fase. |
+| AX-11 | Configurar página | ❌ Ausente | — | Pendiente de su fase. |
+| AX-12 | Vista general de pestañas | ❌ Ausente | — | Pendiente de su fase. |
+| AX-13 | Gestor de espacios de trabajo | ❌ Ausente | — | Pendiente de su fase. |
+| AX-14 | Paleta de comandos e Ir a… | ✅ Completa | Sources/ThinkBox/LibraryCommands.swift:62 | Paleta e Ir a disponibles como paneles de búsqueda. |
+| AX-15 | Bienvenida/primer uso con creación de la primera base. | ❌ Ausente | — | Pendiente de su fase. |
+| NF-01 | VoiceOver en todos los controles (roles y etiquetas), navegación completa por teclado, orden de foco lógico, contraste AA en ambos temas, respetar tamaño de texto y "Reducir movimiento"/"Reducir transparencia". | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| NF-02 | Rendimiento: abrir base de 100 000 elementos en < 3 s; listas virtualizadas; búsqueda < 200 ms en índices grandes; tareas pesadas (OCR, indexado, conversión, IA) en segundo plano y cancelables. | ❌ Ausente | — | Pendiente de su fase. |
+| NF-03 | Interfaz traducible (español por defecto + inglés), fechas y números localizados, compatibilidad con texto de derecha a izquierda. | 🟡 Parcial | Sources/ThinkBox/ThinkBoxApp.swift:14 | Controles, ventana o menús nativos. Verificar el alcance exacto en macOS. |
+| NF-04 | Robustez: ninguna operación destructiva sin deshacer o confirmación; recuperación tras cierre inesperado; escritura atómica de metadatos. | 🟡 Parcial | Sources/WritingLibrary/WritingLibrary.swift:91 | Modelo local con papelera, búsqueda en memoria, enlaces y persistencia atómica. |
+| QA-01 | Tests unitarios: modelo de datos (réplicas, duplicados, etiquetas), motor de búsqueda (operadores y campos), reglas inteligentes (condiciones/acciones), marcadores de posición, paginación (número de páginas y saltos para documentos de referencia). | 🟡 Parcial | Tests/WritingLibraryTests/FuzzyTitleQueryTests.swift; Tests/WritingLibraryTests | Prueba nueva para abreviaturas y diacríticos; cobertura existente del modelo. |
+| QA-02 | Tests de integración/UI: gesto de plegado (simulación de eventos de desplazamiento horizontal y vertical, inercia, desplazamiento natural on/off), los 4 estados de vista de página en editor/previsualización, coincidencia previsualización paginada ↔ PDF exportado, menús y atajos registrados. | ❌ Ausente | — | Pendiente de su fase. |
+| QA-03 | Prueba de regresión visual de temas oscuro/claro en las pantallas principales. | 🟡 Parcial | Tests/WritingLibraryTests | Suite del modelo existente y revisión visual manual en la entrega anterior. Faltan las pruebas de la especificación nueva. |
