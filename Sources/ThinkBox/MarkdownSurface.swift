@@ -127,6 +127,11 @@ struct MarkdownSurface: NSViewRepresentable {
             editor.string = text
             context.coordinator.synchronizedText = text
         }
+        if let flow = editor.pageFlow, let manager = editor.layoutManager {
+            let hides = options.hideMarkdown == true && !plain && richTextData == nil
+            if hides == flow.hidesSyntax && replacedText { flow.reload(in: manager, caret: editor.selectedRange()) }
+            flow.setHidesSyntax(hides, in: manager, caret: editor.selectedRange())
+        }
         if replacedText || geometryChanged || context.coordinator.appliedOptions != options
             || context.coordinator.appliedDarkPaper != paper?.dark {
             applyOptions(to: editor, in: scroll)
@@ -170,6 +175,8 @@ struct MarkdownSurface: NSViewRepresentable {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = CGFloat(options.lineSpacing)
         paragraph.lineBreakMode = (paper != nil || options.wrapLines) ? .byWordWrapping : .byClipping
+        if options.justify == true { paragraph.alignment = .justified }
+        if options.hyphenate == true { paragraph.hyphenationFactor = 1 }
         if richTextData == nil { editor.font = font; editor.textColor = color }
         editor.insertionPointColor = color
         editor.defaultParagraphStyle = paragraph
@@ -295,6 +302,9 @@ struct MarkdownSurface: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let editor = notification.object as? NSTextView else { return }
             guard !editor.hasMarkedText() else { edit = nil; return }
+            if let flow = (editor as? Editor)?.pageFlow, let manager = editor.layoutManager {
+                flow.textChanged(in: manager, caret: editor.selectedRange())
+            }
             if (editor as? Editor)?.paper != nil { scheduleSettledPageCount() }
             let currentText = editor.string
             synchronizedText = currentText
@@ -335,6 +345,9 @@ struct MarkdownSurface: NSViewRepresentable {
 
         func textViewDidChangeSelection(_ notification: Notification) {
             if let editor = notification.object as? NSTextView {
+                if let flow = (editor as? Editor)?.pageFlow, let manager = editor.layoutManager, !editor.hasMarkedText() {
+                    flow.caretMoved(in: manager, caret: editor.selectedRange())
+                }
                 let range = editor.selectedRange()
                 Task { @MainActor in parent.onSelect(range) }
             }
@@ -585,6 +598,76 @@ final class PageFlow: NSObject, NSLayoutManagerDelegate {
     private var geometry: (stride: CGFloat, height: CGFloat, oddX: CGFloat, evenX: CGFloat)?
     var plain = false
 
+    // MARK: Hidden Markdown punctuation
+
+    private(set) var hidesSyntax = false
+    /// Character offsets of Markdown punctuation, recomputed after each edit.
+    private var syntax = IndexSet()
+    /// Paragraph holding the caret: its punctuation stays visible so it can be edited.
+    private var revealed = NSRange(location: NSNotFound, length: 0)
+
+    func setHidesSyntax(_ hides: Bool, in manager: NSLayoutManager, caret: NSRange) {
+        guard hides != hidesSyntax else { return }
+        hidesSyntax = hides
+        guard let storage = manager.textStorage else { return }
+        syntax = hides ? MarkdownSyntax.punctuation(in: storage.string) : IndexSet()
+        revealed = hides ? paragraph(of: caret, in: storage) : NSRange(location: NSNotFound, length: 0)
+        manager.invalidateGlyphs(forCharacterRange: NSRange(location: 0, length: storage.length), changeInLength: 0,
+                                 actualCharacterRange: nil)
+    }
+
+    /// After the whole text is replaced (another document, an external change).
+    func reload(in manager: NSLayoutManager, caret: NSRange) {
+        guard hidesSyntax else { return }
+        hidesSyntax = false
+        setHidesSyntax(true, in: manager, caret: caret)
+    }
+
+    func textChanged(in manager: NSLayoutManager, caret: NSRange) {
+        guard hidesSyntax, let storage = manager.textStorage else { return }
+        syntax = MarkdownSyntax.punctuation(in: storage.string)
+        revealed = paragraph(of: caret, in: storage)
+        manager.invalidateGlyphs(forCharacterRange: revealed, changeInLength: 0, actualCharacterRange: nil)
+    }
+
+    func caretMoved(in manager: NSLayoutManager, caret: NSRange) {
+        guard hidesSyntax, let storage = manager.textStorage else { return }
+        let next = paragraph(of: caret, in: storage)
+        guard next != revealed else { return }
+        let previous = revealed
+        revealed = next
+        for range in [previous, next] where range.location != NSNotFound && NSMaxRange(range) <= storage.length {
+            manager.invalidateGlyphs(forCharacterRange: range, changeInLength: 0, actualCharacterRange: nil)
+        }
+    }
+
+    private func paragraph(of caret: NSRange, in storage: NSTextStorage) -> NSRange {
+        guard caret.location != NSNotFound, caret.location <= storage.length else { return NSRange(location: NSNotFound, length: 0) }
+        return (storage.string as NSString).paragraphRange(for: caret)
+    }
+
+    func layoutManager(_ layoutManager: NSLayoutManager, shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
+                       properties: UnsafePointer<NSLayoutManager.GlyphProperty>,
+                       characterIndexes: UnsafePointer<Int>, font: NSFont, forGlyphRange glyphRange: NSRange) -> Int {
+        guard hidesSyntax, !syntax.isEmpty else { return 0 }
+        let count = glyphRange.length
+        var changed = false
+        var adjusted = [NSLayoutManager.GlyphProperty](UnsafeBufferPointer(start: properties, count: count))
+        for index in 0..<count {
+            let character = characterIndexes[index]
+            if syntax.contains(character) && !NSLocationInRange(character, revealed) {
+                adjusted[index] = .null
+                changed = true
+            }
+        }
+        guard changed else { return 0 }
+        adjusted.withUnsafeBufferPointer { buffer in
+            layoutManager.setGlyphs(glyphs, properties: buffer.baseAddress!, characterIndexes: characterIndexes,
+                                    font: font, forGlyphRange: glyphRange)
+        }
+        return count
+    }
+
     func layoutManager(_ layoutManager: NSLayoutManager,
                        shouldSetLineFragmentRect fragment: UnsafeMutablePointer<NSRect>,
                        lineFragmentUsedRect used: UnsafeMutablePointer<NSRect>,
@@ -653,4 +736,49 @@ private final class SourceScrollView: NSScrollView {
     /// Pinch does nothing: the sheet scale is fixed by the panel width (F2-R07).
     override func magnify(with event: NSEvent) {}
     override func smartMagnify(with event: NSEvent) {}
+}
+
+
+/// Finds the punctuation the editor hides when «Ocultar signos de Markdown» is on: heading and
+/// quote markers, emphasis and code delimiters, and link or image syntax around the visible
+/// text. Lists keep their markers (they are content), and fenced code blocks are left alone.
+enum MarkdownSyntax {
+    static func punctuation(in text: String) -> IndexSet {
+        let source = text as NSString
+        var result = IndexSet()
+        var fence: String?
+        source.enumerateSubstrings(in: NSRange(location: 0, length: source.length), options: [.byLines, .substringNotRequired]) { _, line, _, _ in
+            let value = source.substring(with: line)
+            let trimmed = value.drop(while: { $0 == " " || $0 == "\t" })
+            if let marker = trimmed.first, marker == "`" || marker == "~",
+               trimmed.prefix(while: { $0 == marker }).count >= 3 {
+                let token = String(trimmed.prefix(while: { $0 == marker }))
+                if fence == nil { fence = token } else if token.hasPrefix(fence!) { fence = nil }
+                return
+            }
+            guard fence == nil else { return }
+            for (pattern, groups) in rules {
+                for match in pattern.matches(in: value, range: NSRange(location: 0, length: (value as NSString).length)) {
+                    for group in groups {
+                        let range = match.range(at: group)
+                        guard range.location != NSNotFound, range.length > 0 else { continue }
+                        result.insert(integersIn: (line.location + range.location)..<(line.location + NSMaxRange(range)))
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    /// Each rule lists the capture groups that are punctuation.
+    private static let rules: [(NSRegularExpression, [Int])] = [
+        (#"^( {0,3}#{1,6}[ \t]+)"#, [1]),
+        (#"^( {0,3}>[ \t]?)"#, [1]),
+        (#"(!?\[)[^\]\n]+(\]\([^)\n]*\))"#, [1, 2]),
+        (#"(`)[^`\n]+(`)"#, [1, 2]),
+        (#"(\*\*|__)(?=\S)[^\n]*?(?<=\S)(\1)"#, [1, 2]),
+        (#"(~~)(?=\S)[^\n]*?(?<=\S)(~~)"#, [1, 2]),
+        (#"(?<![\*\w])(\*)(?=[^\s\*])[^\n\*]*?(?<=[^\s\*])(\*)(?!\*)"#, [1, 2]),
+        (#"(?<![_\w])(_)(?=[^\s_])[^\n_]*?(?<=[^\s_])(_)(?![_\w])"#, [1, 2]),
+    ].map { (try! NSRegularExpression(pattern: $0.0, options: [.anchorsMatchLines]), $0.1) }
 }

@@ -42,6 +42,10 @@ struct DocumentEditor: View {
     @ViewState private var pageNumber = ""
     @ViewState private var insertion: TextInsertion?
     @ViewState private var rendered: (input: MarkdownPageInput, pages: MarkdownPages)?
+    /// Zoom of the paginated preview relative to the editor's sheet width (1 = same as the editor).
+    @ViewState private var previewZoom: CGFloat = 1
+    @ViewState private var renderSequence = 0
+    @ViewState private var shownSequence = 0
     @ViewState private var pageDisplay = PageDisplay.continuous
     @ViewState private var pageZoom = PageZoom.width
     @ViewState private var sourceZoom = PageZoom.width
@@ -120,7 +124,9 @@ struct DocumentEditor: View {
                                     group: projects.joined(separator: ", "), author: settings.reader.author),
                                  dark: darkPaper, richTextData: document.richTextData,
                                  imageRoots: store.markdownImageRoots(for: document.id),
-                                 bodySize: CGFloat(settings.editor.fontSize))
+                                 bodySize: CGFloat(settings.preview.fontSize), bodyFont: settings.preview.font,
+                                 lineSpacing: CGFloat(settings.preview.lineSpacing),
+                                 justified: settings.preview.justify, hyphenated: settings.preview.hyphenate)
     }
 
     private var shouldRender: Bool { pageViews.mode != .source && pageViews.preview }
@@ -134,21 +140,23 @@ struct DocumentEditor: View {
             if case .writing(let state) = readerRestore?.state { restoreReading(state) }
         }
         .task(id: shouldRender ? pageInput : nil) {
+            // The preview follows typing: renders run one at a time, the newest input waits for
+            // the one in progress, and a result is shown even if more text arrived meanwhile,
+            // unless a newer result is already on screen.
             guard shouldRender else { return }
             let input = pageInput
-            if rendered != nil {
-                do { try await Task.sleep(for: .milliseconds(220)) }
-                catch { return }
+            renderSequence += 1
+            let sequence = renderSequence
+            guard let pages = await PreviewRenderQueue.shared.render(input) else {
+                if !Task.isCancelled && sequence > shownSequence {
+                    rendered = nil
+                    store.actionError = "No se pudo componer la vista de página."
+                }
+                return
             }
-            guard !Task.isCancelled else { return }
-            let pages = await MarkdownPagination.renderPreview(input)
-            guard !Task.isCancelled else { return }
-            if let pages {
-                rendered = (input, pages)
-            } else {
-                rendered = nil
-                store.actionError = "No se pudo componer la vista de página."
-            }
+            guard sequence > shownSequence else { return }
+            shownSequence = sequence
+            rendered = (input, pages)
         }
         .sheet(isPresented: $showPageSetup) {
             PageSetupSheet(layout: pageLayout) { layout in
@@ -262,15 +270,7 @@ struct DocumentEditor: View {
                 .font(settings.font(5, bold: true)).textFieldStyle(.plain)
                 .focused($titleFocused).accessibilityLabel("Título del texto")
                 .disabled(document.trashedAt != nil)
-            if width < 340 {
-                Menu {
-                    writingModes(mode)
-                } label: { ChromeSymbol(name: "rectangle.split.2x1") }
-                    .chromeMenu()
-                    .accessibilityLabel("Vista de escritura")
-            } else {
-                writingModes(mode).labelsHidden().fixedSize()
-            }
+            writingModes(mode)
             Button { outlineVisible.toggle() } label: { ChromeSymbol(name: "list.bullet.indent") }
                 .buttonStyle(ChromeButtonStyle()).help("Mostrar u ocultar esquema").accessibilityLabel("Mostrar u ocultar esquema")
                 .popover(isPresented: Binding(get: { !docked && outlineVisible },
@@ -283,11 +283,18 @@ struct DocumentEditor: View {
         .padding(.horizontal, 18).padding(.vertical, 10)
     }
 
+    /// Editor, split and preview as three separate buttons (DEVONthink-style), the active one lit.
     private func writingModes(_ mode: Binding<WritingViewMode>) -> some View {
-        Picker("Vista de escritura", selection: mode) {
-            ForEach(WritingViewMode.allCases, id: \.self) { Text($0.title).tag($0) }
+        HStack(spacing: 2) {
+            ForEach([WritingViewMode.source, .split, .preview], id: \.self) { value in
+                let active = mode.wrappedValue == value
+                Button { mode.wrappedValue = value } label: { ChromeSymbol(name: value.symbol) }
+                    .buttonStyle(ChromeButtonStyle(active: active))
+                    .help(value.title).accessibilityLabel(value.title)
+                    .accessibilityAddTraits(active ? .isSelected : [])
+            }
         }
-        .accessibilityLabel("Vista de escritura")
+        .accessibilityElement(children: .contain).accessibilityLabel("Vista de escritura")
     }
 
     private func sourcePanel(width: CGFloat) -> some View {
@@ -302,6 +309,14 @@ struct DocumentEditor: View {
                             .buttonStyle(ChromeButtonStyle()).help("Mostrar u ocultar reglas")
                             .accessibilityLabel("Mostrar u ocultar reglas")
                     }
+                }
+                if document.plainText != true && document.richTextData == nil {
+                    let hiding = settings.editor.hideMarkdown == true
+                    Button { settings.editor.hideMarkdown = !hiding } label: { ChromeSymbol(name: "number") }
+                        .buttonStyle(ChromeButtonStyle(active: hiding))
+                        .help(hiding ? "Mostrar los signos de Markdown" : "Ocultar los signos de Markdown")
+                        .accessibilityLabel("Ocultar los signos de Markdown")
+                        .accessibilityValue(hiding ? "Activado" : "Desactivado")
                 }
                 pageToggle("Vista de página del editor", enabled: pageViews.editor) {
                     changeViews { $0.editor.toggle() }
@@ -347,6 +362,17 @@ struct DocumentEditor: View {
                             if let previewView { PDFThumbnails(pdf: previewView).frame(width: 140, height: 320) }
                         }
                 }
+                if pageViews.preview {
+                    previewZoomButton("Reducir", symbol: "minus.magnifyingglass", enabled: previewZoom > 0.5) {
+                        previewZoom = max(0.5, (previewZoom / 1.25 * 100).rounded() / 100)
+                    }
+                    previewZoomButton("Ancho del editor", symbol: "1.magnifyingglass", enabled: previewZoom != 1) {
+                        previewZoom = 1
+                    }
+                    previewZoomButton("Aumentar", symbol: "plus.magnifyingglass", enabled: previewZoom < 4) {
+                        previewZoom = min(4, (previewZoom * 1.25 * 100).rounded() / 100)
+                    }
+                }
                 pageToggle("Vista de página de la previsualización", enabled: pageViews.preview) {
                     changeViews { $0.preview.toggle() }
                 }
@@ -363,7 +389,7 @@ struct DocumentEditor: View {
                             PDFThumbnails(pdf: previewView).frame(width: 105)
                             Divider()
                         }
-                        PaginatedPreview(pages: rendered.pages, display: pageDisplay,
+                        PaginatedPreview(pages: rendered.pages, display: pageDisplay, zoom: previewZoom,
                                          destination: previewTarget, onPage: previewMoved,
                                          onView: { previewView = $0 })
                     }.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -374,7 +400,8 @@ struct DocumentEditor: View {
                 ContinuousMarkdownPreview(input: MarkdownPageInput(source: pageInput.source, plain: pageInput.plain,
                     layout: pageLayout, metadata: pageInput.metadata, dark: scheme == .dark,
                     richTextData: document.richTextData, imageRoots: pageInput.imageRoots,
-                    continuousWidth: max(0, width - 40), bodySize: CGFloat(settings.editor.fontSize)),
+                    continuousWidth: max(0, width - 40), bodySize: pageInput.bodySize, bodyFont: pageInput.bodyFont,
+                    lineSpacing: pageInput.lineSpacing, justified: pageInput.justified, hyphenated: pageInput.hyphenated),
                     sourceTarget: continuousTarget, onSource: continuousMoved) { url in
                     if let target = ItemDestination(url: url) { openDocument(target) }
                     else if ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "") {
@@ -405,6 +432,13 @@ struct DocumentEditor: View {
         } label: { ChromeSymbol(name: "ellipsis") }
         .chromeMenu()
         .help("Disposición de la previsualización").accessibilityLabel("Disposición de la previsualización")
+    }
+
+    private func previewZoomButton(_ label: String, symbol: String, enabled: Bool,
+                                   action: @escaping () -> Void) -> some View {
+        Button(action: action) { ChromeSymbol(name: symbol) }
+            .buttonStyle(ChromeButtonStyle(compact: true)).disabled(!enabled)
+            .help(label).accessibilityLabel(label)
     }
 
     private func pageToggle(_ label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
@@ -780,7 +814,7 @@ struct DocumentDetails: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 7) {
                         ForEach(store.library.projects) { project in
-                            Toggle(project.name, isOn: Binding(
+                            Toggle(store.library.groupPath(of: project.id), isOn: Binding(
                                 get: { document.projectIDs.contains(project.id) }, set: { enabled in
                                     store.update(document.id) {
                                         if enabled { $0.projectIDs.insert(project.id) }

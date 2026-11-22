@@ -86,6 +86,15 @@ struct PageSetupSheet: View {
 }
 
 extension WritingViewMode {
+    var symbol: String {
+        switch self {
+        case .source: "pencil"
+        case .split: "rectangle.split.2x1"
+        case .preview: "book"
+        }
+    }
+
+
     var title: String {
         switch self {
         case .source: "Editor"

@@ -32,6 +32,9 @@ struct PageDestination: Equatable {
 struct PaginatedPreview: NSViewRepresentable {
     let pages: MarkdownPages
     let display: PageDisplay
+    /// Scale relative to the editor's sheet (the panel width minus the border); set only by the
+    /// zoom buttons in the preview header, never by pinching.
+    var zoom: CGFloat = 1
     let destination: PageDestination?
     let onPage: (Int) -> Void
     let onView: (PDFView) -> Void
@@ -45,7 +48,7 @@ struct PaginatedPreview: NSViewRepresentable {
         view.setAccessibilityLabel("Previsualización paginada")
         view.backgroundColor = NSColor.windowBackgroundColor.blended(withFraction: 0.1, of: .black) ?? .windowBackgroundColor
         view.displaysPageBreaks = true
-        view.pageBreakMargins = NSEdgeInsets(top: 6, left: 0, bottom: 6, right: 0)
+        view.pageBreakMargins = NSEdgeInsets(top: MarkdownSurface.Editor.pageGap, left: 0, bottom: 0, right: 0)
         view.minScaleFactor = 0.15
         view.maxScaleFactor = 4
         NotificationCenter.default.addObserver(context.coordinator, selector: #selector(Coordinator.pageChanged(_:)),
@@ -62,7 +65,10 @@ struct PaginatedPreview: NSViewRepresentable {
             coordinator.reportPage(view)
         }
         let previous = view.currentPage.flatMap { view.document?.index(for: $0) } ?? 0
+        let offset = view.documentView?.enclosingScrollView?.contentView.bounds.origin
         let changedData = coordinator.data != pages.data
+        let changedZoom = coordinator.zoom != zoom
+        coordinator.zoom = zoom
         let changedDisplay = view.displayMode != display.mode
         if changedDisplay {
             view.displayMode = display.mode
@@ -72,10 +78,15 @@ struct PaginatedPreview: NSViewRepresentable {
             coordinator.data = pages.data
             view.document = PDFDocument(data: pages.data)
         }
-        if changedData || changedDisplay { coordinator.fitWidth(view) }
+        if changedData || changedDisplay || changedZoom { coordinator.fitWidth(view) }
         if let destination, destination.id != coordinator.destination {
             coordinator.destination = destination.id
             coordinator.go(destination.index, in: view)
+        } else if changedData && !changedDisplay && !changedZoom, let offset,
+                  let clip = view.documentView?.enclosingScrollView?.contentView {
+            // New text: keep the exact scroll position instead of jumping to the page top.
+            clip.scroll(to: offset)
+            view.documentView?.enclosingScrollView?.reflectScrolledClipView(clip)
         } else if changedData || changedDisplay {
             coordinator.go(previous, in: view)
         }
@@ -90,7 +101,8 @@ struct PaginatedPreview: NSViewRepresentable {
             coordinator.fitWidth(self)
         }
 
-        /// Pinch does nothing: the sheet scale is fixed by the panel width (F2-R07).
+        /// No pinch zoom: the preview is zoomed with its header buttons only, so a two-finger
+        /// gesture over it is free to fold the side panels.
         override func magnify(with event: NSEvent) {}
         override func smartMagnify(with event: NSEvent) {}
     }
@@ -100,6 +112,7 @@ struct PaginatedPreview: NSViewRepresentable {
         var data: Data?
         var destination: UUID?
         var updating = false
+        var zoom: CGFloat = 1
         private var lastPage: Int?
 
         init(_ parent: PaginatedPreview) { self.parent = parent }
@@ -132,7 +145,7 @@ struct PaginatedPreview: NSViewRepresentable {
             let size = page.bounds(for: .mediaBox).size
             guard size.width > 0, view.bounds.width > 60 else { return }
             let shownPages: CGFloat = parent.display == .spreads ? 2 : 1
-            let target = view.bounds.width - DesignTokens.pageBorder * 2
+            let target = (view.bounds.width - DesignTokens.pageBorder * 2) * zoom
             if view.autoScales { view.autoScales = false }
             let scale = max(view.minScaleFactor, min(view.maxScaleFactor, target / (size.width * shownPages)))
             if abs(view.scaleFactor - scale) > 0.002 { view.scaleFactor = scale }
@@ -142,8 +155,28 @@ struct PaginatedPreview: NSViewRepresentable {
             if drawn > 1, abs(drawn - target) > 1 {
                 view.scaleFactor = max(view.minScaleFactor, min(view.maxScaleFactor, view.scaleFactor * target / drawn))
             }
+            alignFirstSheet(view, page: page)
         }
 
+        /// The first sheet starts as far below the top as the editor's does, and sheets are
+        /// spaced the same (`MarkdownSurface.Editor.pageGap`; both views measure it in page
+        /// points, so it scales with the sheet). PDFView centres a document shorter than the
+        /// panel, so the bottom margin grows until the document fills it and stays top-anchored.
+        private func alignFirstSheet(_ view: PDFView, page: PDFPage) {
+            guard let documentView = view.documentView, let document = view.document,
+                  document.pageCount > 0, view.scaleFactor > 0 else { return }
+            let gap = MarkdownSurface.Editor.pageGap
+            var margins = view.pageBreakMargins
+            view.layoutDocumentView()
+            // The bottom margin repeats on every page, so a shortfall is shared among them.
+            let missing = view.bounds.height / view.scaleFactor - documentView.bounds.height
+            let bottom = max(0, margins.bottom + missing / CGFloat(document.pageCount))
+            guard abs(margins.top - gap) > 0.5 || abs(margins.bottom - bottom) > 0.5 else { return }
+            margins.top = gap
+            margins.bottom = bottom
+            view.pageBreakMargins = margins
+            view.layoutDocumentView()
+        }
     }
 }
 

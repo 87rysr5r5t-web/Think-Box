@@ -37,6 +37,8 @@ struct WindowPalette {
     var border: Color { dark ? color(0x2A2A2D) : color(0xDEDEDC) }
     var selection: Color { dark ? color(0x2B2B2E) : color(0xDBDBDA) }
     var hover: Color { dark ? color(0x232325) : color(0xE4E4E2) }
+    /// Every other row of a striped list.
+    var stripe: Color { dark ? color(0x1E1E20) : color(0xF0F0EE) }
     var textPrimary: Color { dark ? color(0xE4E4E4) : color(0x1F1F1F) }
     var textSecondary: Color { dark ? color(0xA0A0A0) : color(0x5C5C5C) }
     var textTertiary: Color { dark ? color(0x808080) : color(0x6A6A6A) }

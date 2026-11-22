@@ -160,7 +160,9 @@ struct PaneScrollMonitor: NSViewRepresentable {
                 if let scroll = current as? NSScrollView, let document = scroll.documentView {
                     let visible = scroll.documentVisibleRect
                     let bounds = document.bounds
-                    if HorizontalScrollPriority.canScroll(delta: event.scrollingDeltaX, offset: visible.minX,
+                    // A few points of overflow (PDFView pads its pages) is not real horizontal
+                    // content; only a genuinely wider document (a zoomed page) keeps the swipe.
+                    if bounds.width - visible.width > 4, HorizontalScrollPriority.canScroll(delta: event.scrollingDeltaX, offset: visible.minX,
                         minimum: bounds.minX, maximum: max(bounds.minX, bounds.maxX - visible.width)) {
                         return true
                     }

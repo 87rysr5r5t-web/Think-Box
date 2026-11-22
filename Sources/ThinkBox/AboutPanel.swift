@@ -18,9 +18,10 @@ enum AppInfo {
     /// The app icon from the bundle (CFBundleIconFile); the generic app icon when run unbundled.
     @MainActor static var icon: NSImage { NSApp.applicationIconImage ?? NSImage() }
 
-    /// The app icon cropped to its tile: the transparent margin macOS icons carry is removed so
-    /// the tile fills the toolbar button instead of floating in empty space. Read from the
-    /// bundle's .icns at a fixed 512 px so the result never depends on what macOS caches.
+    /// The icon's marks (the flower and the corner dot) without the white tile, as a template
+    /// image so the toolbar tints it like every other icon. Dark pixels of the tile become opaque
+    /// and light ones transparent, then the result is cropped to the marks so they fill the
+    /// button. Read from the bundle's .icns at a fixed 512 px so it never depends on macOS caches.
     @MainActor static let badge: NSImage? = {
         let source: NSImage = Bundle.main.url(forResource: "AppIcon", withExtension: "icns")
             .flatMap(NSImage.init(contentsOf:)) ?? icon
@@ -33,18 +34,30 @@ enum AppInfo {
               let pixels = context.data?.bindMemory(to: UInt8.self, capacity: side * side * 4) else { return nil }
         context.interpolationQuality = .high
         context.draw(cgSource, in: CGRect(x: 0, y: 0, width: side, height: side))
-        // Bounds of the opaque tile (ignoring the faint drop shadow).
+        // Keep only the ink: alpha from darkness, inside the opaque tile; colour black.
         var minX = side, minY = side, maxX = -1, maxY = -1
         for y in 0..<side {
-            for x in 0..<side where pixels[(y * side + x) * 4 + 3] > 200 {
-                minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
+            for x in 0..<side {
+                let i = (y * side + x) * 4
+                let alpha = Int(pixels[i + 3])
+                var ink = 0
+                if alpha > 200 {
+                    // Un-premultiply, then luminance; anything lighter than mid-grey fades out.
+                    let r = Int(pixels[i]) * 255 / alpha, g = Int(pixels[i + 1]) * 255 / alpha, b = Int(pixels[i + 2]) * 255 / alpha
+                    let luma = (r * 299 + g * 587 + b * 114) / 1000
+                    ink = max(0, min(255, (200 - luma) * 255 / 120))
+                }
+                pixels[i] = 0; pixels[i + 1] = 0; pixels[i + 2] = 0; pixels[i + 3] = UInt8(ink)
+                if ink > 128 { minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y) }
             }
         }
         guard maxX > minX, maxY > minY, let full = context.makeImage() else { return nil }
-        let extent = max(maxX - minX, maxY - minY) + 1
+        let extent = max(maxX - minX, maxY - minY) + 9
         let crop = CGRect(x: (minX + maxX + 1 - extent) / 2, y: (minY + maxY + 1 - extent) / 2, width: extent, height: extent)
-        guard let tile = full.cropping(to: crop) else { return nil }
-        return NSImage(cgImage: tile, size: NSSize(width: 18, height: 18))
+        guard let marks = full.cropping(to: crop) else { return nil }
+        let image = NSImage(cgImage: marks, size: NSSize(width: 16, height: 16))
+        image.isTemplate = true
+        return image
     }()
 }
 
@@ -55,8 +68,12 @@ struct AboutButton: View {
             Label {
                 Text("Acerca de \(AppInfo.name)")
             } icon: {
-                Image(nsImage: AppInfo.badge ?? AppInfo.icon).renderingMode(.original)
-                    .resizable().interpolation(.high).frame(width: 18, height: 18)
+                if let badge = AppInfo.badge {
+                    Image(nsImage: badge).renderingMode(.template)
+                        .resizable().interpolation(.high).frame(width: 16, height: 16)
+                } else {
+                    Image(nsImage: AppInfo.icon).resizable().interpolation(.high).frame(width: 18, height: 18)
+                }
             }
         }
         .labelStyle(.iconOnly)

@@ -92,10 +92,41 @@ struct EditorOptions: Codable, Equatable {
     var customColors = false
     var paper = RGBColor(0.985, 0.981, 0.973)
     var ink = RGBColor(0.13, 0.14, 0.16)
+    // Optional so editor settings saved before these controls still decode.
+    var justify: Bool? = nil
+    var hyphenate: Bool? = nil
+    /// Hides Markdown punctuation (#, *, `, link targets…) except on the paragraph being edited.
+    var hideMarkdown: Bool? = nil
+}
+
+/// Typography of the paginated preview, the exported PDF and printing, independent of the
+/// editor. Saved under its own key, so it starts from these values on existing installs.
+struct PreviewTextOptions: Codable, Equatable {
+    var font = AppFonts.system
+    var fontSize = 12
+    var lineSpacing = 2
+    var justify = false
+    var hyphenate = false
+}
+
+/// How the document list draws its items, as in DEVONthink: detailed rows, narrow striped rows
+/// or icons.
+enum DocumentListStyle: String, PreferenceChoice {
+    case rows, compact, icons
+
+    var title: String {
+        switch self { case .rows: "Filas con detalles"; case .compact: "Filas estrechas"; case .icons: "Iconos" }
+    }
+
+    var symbol: String {
+        switch self { case .rows: "list.bullet.rectangle"; case .compact: "list.bullet"; case .icons: "square.grid.2x2" }
+    }
 }
 
 struct ListOptions: Codable {
     var order = DocumentOrder.recent
+    // Optional so list settings saved before this control still decode; nil means narrow rows.
+    var style: DocumentListStyle? = nil
     var showDates = true
     var showDetails = true
     var showTags = true
@@ -142,6 +173,8 @@ final class AppSettings {
     var reader: ReadingOptions { didSet { save(reader, as: "reading") } }
     var gestures: GestureOptions { didSet { save(gestures, as: "gestures") } }
     var pages: PageViewOptions { didSet { save(pages, as: "pages") } }
+    var preview: PreviewTextOptions { didSet { save(preview, as: "preview") } }
+    var tint: ChromeTintOptions { didSet { save(tint, as: "tint") } }
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -152,6 +185,8 @@ final class AppSettings {
         reader = Self.load("reading", from: defaults, or: ReadingOptions())
         gestures = Self.load("gestures", from: defaults, or: GestureOptions())
         pages = Self.load("pages", from: defaults, or: PageViewOptions())
+        preview = Self.load("preview", from: defaults, or: PreviewTextOptions())
+        tint = Self.load("tint", from: defaults, or: ChromeTintOptions())
     }
 
     func font(_ offset: Int = 0, bold: Bool = false, list: Bool = false) -> Font {

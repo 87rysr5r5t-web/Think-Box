@@ -12,6 +12,7 @@ struct SettingsView: View {
             editor.tabItem { Label("Editor", line: "text.alignleft") }
             library.tabItem { Label("Biblioteca", line: "folder") }
             reading.tabItem { Label("Lectura", line: "book") }
+            preview.tabItem { Label("Previsualización", line: "doc.richtext") }
             pages.tabItem { Label("Página", line: "doc") }
             gestures.tabItem { Label("Gestos", line: "hand.point.up.left") }
         }
@@ -98,6 +99,8 @@ struct SettingsView: View {
                 pointStepper("Tamaño del editor", value: $settings.editor.fontSize, range: 10...34)
                 pointStepper("Interlineado adicional", value: $settings.editor.lineSpacing, range: 0...18)
                 pointStepper("Ancho de la columna", value: $settings.editor.columnWidth, range: 480...1200, step: 20)
+                Toggle("Justificar el texto", isOn: optionalFlag(\.justify))
+                Toggle("Partir palabras con guiones", isOn: optionalFlag(\.hyphenate))
                 Toggle("Ajustar líneas al ancho de la columna", isOn: $settings.editor.wrapLines)
                 Toggle("Mostrar recuento de palabras", isOn: $settings.editor.showWordCount)
             }
@@ -121,10 +124,36 @@ struct SettingsView: View {
         }.formStyle(.grouped)
     }
 
+    /// Typography of the preview, the exported PDF and printing; independent of the editor.
+    private var preview: some View {
+        Form {
+            Section {
+                FontFacePicker(title: "Fuente de la previsualización", selected: $settings.preview.font)
+                pointStepper("Tamaño de la previsualización", value: $settings.preview.fontSize, range: 8...28)
+                pointStepper("Interlineado adicional", value: $settings.preview.lineSpacing, range: 0...18)
+                Toggle("Justificar el texto", isOn: $settings.preview.justify)
+                Toggle("Partir palabras con guiones", isOn: $settings.preview.hyphenate)
+            } header: {
+                Text("Texto")
+            } footer: {
+                Text("Se aplica a la previsualización, al PDF exportado y a la impresión. El editor tiene sus propios ajustes.")
+            }
+            Button("Restablecer previsualización") { settings.preview = PreviewTextOptions() }
+        }.formStyle(.grouped)
+    }
+
+    private func optionalFlag(_ key: WritableKeyPath<EditorOptions, Bool?>) -> Binding<Bool> {
+        Binding(get: { settings.editor[keyPath: key] ?? false }, set: { settings.editor[keyPath: key] = $0 })
+    }
+
     private var library: some View {
         Form {
             Section("Lista de documentos") {
                 ChoicePicker("Ordenar por", selection: $settings.list.order)
+                Picker("Vista", selection: Binding(get: { settings.list.style ?? .compact },
+                                                   set: { settings.list.style = $0 })) {
+                    ForEach(DocumentListStyle.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
                 Toggle("Mostrar fecha de modificación", isOn: $settings.list.showDates)
                 Toggle("Mostrar tipos y estados", isOn: $settings.list.showDetails)
                 Toggle("Mostrar etiquetas en resultados", isOn: $settings.list.showTags)
