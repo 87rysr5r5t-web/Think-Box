@@ -81,15 +81,12 @@ struct LibraryView: View {
             if let error = store.openError {
                 VStack(spacing: 12) {
                     databaseMenu
-                    ContentUnavailableView("No se pudo abrir la base de datos", systemImage: "exclamationmark.triangle",
+                    ContentUnavailableView("No se pudo abrir la base de datos", line: "exclamationmark.triangle",
                                            description: Text(error))
                 }
             } else {
                 let results = store.library.results(in: scope, matching: query)
                 VStack(spacing: 0) {
-                    toolbar
-                    workspaceMenu
-                    rule
                     if tabs.count > 1 { tabBar; rule }
                     GeometryReader { paneWorkspace(size: $0.size, results: results) }
                     rule
@@ -97,9 +94,12 @@ struct LibraryView: View {
                 }
             }
         }
-        .tint(palette.tint)
+        .themedWindow()
         .background(palette.workspace)
         .background { MainWindowTracker() }
+        .overlay { AboutOverlay() }
+        .toolbar(id: "library") { libraryToolbar }
+        .toolbarRole(.editor)
         .focusedSceneValue(\.libraryCommands, LibraryCommandContext(allows: allows, run: { run($0) },
                                                                     isSelected: isSelected))
         .sheet(item: $quickMode, onDismiss: {
@@ -171,8 +171,8 @@ struct LibraryView: View {
                             workspaceName = workspace.name
                             editingWorkspaceName = true
                         }
-                        Button("Eliminar", systemImage: "trash", role: .destructive) { deleteWorkspace(workspace) }
-                            .labelStyle(.iconOnly)
+                        Button("Eliminar", line: "trash", role: .destructive) { deleteWorkspace(workspace) }
+                            .labelStyle(.iconOnly).buttonStyle(ChromeButtonStyle())
                     }
                 }
                 HStack {
@@ -204,24 +204,22 @@ struct LibraryView: View {
     }
 
     private var workspaceMenu: some View {
-        HStack {
-            Menu("Espacios de trabajo") {
-                Button(LibraryCommand.saveWorkspace.title) { run(.saveWorkspace) }
-                Button(LibraryCommand.manageWorkspaces.title) { run(.manageWorkspaces) }
-                ForEach(savedWorkspaces) { workspace in
-                    Menu(workspace.name) {
-                        Button("Restaurar") { restoreWorkspace(workspace) }
-                        Button("Renombrar…") {
-                            workspaceToRename = workspace.id; workspaceName = workspace.name; editingWorkspaceName = true
-                        }
-                        Button("Eliminar", role: .destructive) {
-                            deleteWorkspace(workspace)
-                        }
+        Menu {
+            Button(LibraryCommand.saveWorkspace.title) { run(.saveWorkspace) }
+            Button(LibraryCommand.manageWorkspaces.title) { run(.manageWorkspaces) }
+            if !savedWorkspaces.isEmpty { Divider() }
+            ForEach(savedWorkspaces) { workspace in
+                Menu(workspace.name) {
+                    Button("Restaurar") { restoreWorkspace(workspace) }
+                    Button("Renombrar…") {
+                        workspaceToRename = workspace.id; workspaceName = workspace.name; editingWorkspaceName = true
                     }
+                    Button("Eliminar", role: .destructive) { deleteWorkspace(workspace) }
                 }
-            }.menuStyle(.borderlessButton).fixedSize()
-            Spacer()
-        }.padding(.horizontal, 12).frame(height: 24)
+            }
+        } label: { Label("Espacios de trabajo", line: "rectangle.on.rectangle") }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).labelStyle(.iconOnly).fixedSize()
+            .help("Espacios de trabajo")
     }
 
     private func deleteWorkspace(_ workspace: SavedWorkspace) {
@@ -306,7 +304,7 @@ struct LibraryView: View {
                     ForEach([LibraryCommand.newProject, .importFiles, .newCanvas, .palette]) { command in
                         Button(command.title) { run(command) }
                     }
-                    Button("Reglas de etiquetado…", systemImage: "tag") { showTagSettings = true }
+                    Button("Reglas de etiquetado…", line: "tag") { showTagSettings = true }
                 } label: {
                     ChromeSymbol(name: "ellipsis")
                 }
@@ -324,7 +322,7 @@ struct LibraryView: View {
                         Menu {
                             Button(LibraryCommand.newDatabase.title) { run(.newDatabase) }
                             Button(LibraryCommand.openDatabase.title) { run(.openDatabase) }
-                        } label: { Image(systemName: "plus") }
+                        } label: { ChromeSymbol(name: "plus") }
                             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                             .accessibilityLabel("Añadir base de datos")
                     }
@@ -338,7 +336,7 @@ struct LibraryView: View {
                     scopeButton("Borradores", icon: "pencil", destination: .drafts)
                     scopeButton("Papelera", icon: "trash", destination: .trash)
                     sectionHeader("Grupos") {
-                        Button(LibraryCommand.newProject.title, systemImage: "plus") { run(.newProject) }
+                        Button(LibraryCommand.newProject.title, line: "plus") { run(.newProject) }
                             .labelStyle(.iconOnly)
                             .buttonStyle(.plain)
                             .help("Nuevo grupo")
@@ -364,40 +362,7 @@ struct LibraryView: View {
     }
 
     private func resultsPane(_ results: [LibraryResult]) -> some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text(scopeTitle).font(settings.font(-1, bold: true)).lineLimit(1)
-                Spacer()
-                if layout != .listOnly { chrome(.results, symbol: "line.3.horizontal", label: "Ocultar lista") }
-            }.padding(.horizontal, 12).padding(.top, 5)
-            HStack(spacing: 8) {
-                ChromeSymbol(name: "magnifyingglass", size: 12).foregroundStyle(.secondary)
-                TextField("Buscar en esta vista", text: Binding(get: { query }, set: { query = $0 }))
-                    .textFieldStyle(.plain)
-                    .focused($searchFocused)
-                    .accessibilityIdentifier("library-search")
-                if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Button("Guardar búsqueda en la base activa", systemImage: "bookmark") {
-                        dialog = .savedSearch(query.trimmingCharacters(in: .whitespacesAndNewlines))
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.plain)
-                    .help("Guardar búsqueda en la base activa")
-                    Button("Borrar búsqueda", systemImage: "xmark") { query = "" }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(8)
-            .background(palette.selection.opacity(0.55), in: .rect(cornerRadius: DesignTokens.rowRadius))
-            .overlay { RoundedRectangle(cornerRadius: DesignTokens.rowRadius).strokeBorder(palette.border) }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 9)
-
-            documentList(results)
-        }
-        .background(palette.workspace)
+        documentList(results).background(palette.workspace)
     }
 
     private var sidebarFooter: some View {
@@ -417,8 +382,8 @@ struct LibraryView: View {
     private var tagsSection: some View {
         Group {
             sectionHeader("Etiquetas") {
-                Button(LibraryCommand.newTag.title, systemImage: "plus") { run(.newTag) }
-                    .labelStyle(.iconOnly).buttonStyle(.plain).help("Nueva etiqueta")
+                Button(LibraryCommand.newTag.title, line: "plus") { run(.newTag) }
+                    .labelStyle(.iconOnly).buttonStyle(ChromeButtonStyle()).buttonStyle(.plain).help("Nueva etiqueta")
             }
             SwipeTree(nodes: store.library.tagTree, children: { $0.children }) { branch in
                 scopeButton(branch.name, icon: "tag", destination: .tag(branch.id))
@@ -621,7 +586,10 @@ struct LibraryView: View {
     private func centralWorkspace(width: CGFloat, results: [LibraryResult]) -> some View {
         let stacked = layout == .stacked
         let arrangement = stacked ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
-        return arrangement {
+        return VStack(spacing: 0) {
+        locationBar(count: results.count)
+        rule
+        arrangement {
             if ((listVisible || swipePreview?.pane == .results) && layout != .focus) || layout == .listOnly {
                 let extent = resultsExtent(width)
                 resultsPane(results).frame(width: !stacked && layout != .listOnly ? extent : nil,
@@ -640,6 +608,7 @@ struct LibraryView: View {
             if layout != .listOnly {
                 workspace.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -668,7 +637,7 @@ struct LibraryView: View {
             return (details.isOpen ? direction == .right : direction == .left) ? details : nil
         }
         guard layout != .listOnly else { return nil }
-        let inResults = layout == .stacked ? point.y <= (results.isOpen ? results.extent + 3 : edge)
+        let inResults = layout == .stacked ? point.y <= DesignTokens.pathBarHeight + (results.isOpen ? results.extent + 3 : edge)
             : point.x <= navEnd + (results.isOpen ? results.extent + 3 : edge)
         if inResults {
             return (results.isOpen ? direction == .left : direction == .right) ? results : nil
@@ -711,45 +680,103 @@ struct LibraryView: View {
         }
     }
 
-    private func chrome(_ command: LibraryCommand, symbol: String, label: String? = nil) -> some View {
+    private func chrome(_ command: LibraryCommand, symbol: String, label: String? = nil, active: Bool = false) -> some View {
         Button { run(command) } label: { ChromeSymbol(name: symbol) }
-            .buttonStyle(ChromeButtonStyle())
+            .buttonStyle(ChromeButtonStyle(active: active))
+            .accessibilityAddTraits(active ? .isSelected : [])
             .accessibilityLabel(label ?? command.title)
             .help(label ?? command.title)
             .disabled(!allows(command))
     }
 
-    private var toolbar: some View {
+    /// Main toolbar, DEVONthink-style: a native unified toolbar that spans the whole window above
+    /// every pane and holds the window controls. Groups by function: panels and list view,
+    /// creation, search, inspector. Customisable from Visualización → Personalizar barra de herramientas.
+    @ToolbarContentBuilder private var libraryToolbar: some CustomizableToolbarContent {
+        ToolbarItem(id: "about", placement: .navigation) { AboutButton() }
+        ToolbarItem(id: "sidebar", placement: .navigation) {
+            chrome(.sidebar, symbol: "sidebar.left", label: sidebarVisible && layout != .focus ? "Ocultar barra lateral" : "Mostrar barra lateral",
+                   active: sidebarVisible && layout != .focus)
+        }
+        ToolbarItem(id: "listView", placement: .navigation) {
+            HStack(spacing: 2) {
+                chrome(.wide, symbol: "rectangle.split.2x1", label: "Lista a la izquierda", active: layout == .wide)
+                chrome(.stacked, symbol: "rectangle.split.1x2", label: "Lista arriba", active: layout == .stacked)
+                chrome(.listOnly, symbol: "list.bullet.rectangle", label: "Lista en el centro", active: layout == .listOnly)
+            }
+            .padding(2)
+            .overlay { RoundedRectangle(cornerRadius: DesignTokens.rowRadius).strokeBorder(palette.border) }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Vista de la lista de documentos")
+        }
+        ToolbarItem(id: "newText", placement: .primaryAction) {
+            chrome(.newText, symbol: "square.and.pencil")
+        }
+        ToolbarItem(id: "newTab", placement: .primaryAction) {
+            chrome(.newTab, symbol: "rectangle.on.rectangle.badge.plus")
+        }
+        ToolbarItem(id: "workspaces", placement: .primaryAction) {
+            workspaceMenu
+        }
+        ToolbarItem(id: "search", placement: .primaryAction) {
+            searchField.frame(minWidth: 180, idealWidth: 300, maxWidth: 420)
+        }
+        ToolbarItem(id: "inspector", placement: .primaryAction) {
+            chrome(.inspector, symbol: "sidebar.right", label: inspectorVisible && layout != .focus ? "Ocultar inspector" : "Mostrar inspector",
+                   active: inspectorVisible && layout != .focus)
+        }
+        ToolbarItem(id: "settings", placement: .primaryAction) {
+            SettingsLink { ChromeSymbol(name: "gearshape") }
+                .buttonStyle(ChromeButtonStyle()).accessibilityLabel("Ajustes").help("Ajustes")
+        }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            ChromeSymbol(name: "magnifyingglass", size: 13).foregroundStyle(palette.textTertiary)
+            TextField("Buscar en esta vista", text: Binding(get: { query }, set: { query = $0 }))
+                .textFieldStyle(.plain)
+                .focused($searchFocused)
+                .accessibilityIdentifier("library-search")
+            if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button("Guardar búsqueda en la base activa", line: "bookmark") {
+                    dialog = .savedSearch(query.trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+                .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(palette.textSecondary)
+                .help("Guardar búsqueda en la base activa")
+                Button("Borrar búsqueda", line: "xmark") { query = "" }
+                    .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(palette.textSecondary)
+            }
+        }
+        .font(settings.font(-1))
+        .padding(.horizontal, 8).frame(height: 26)
+        .background(palette.background, in: .rect(cornerRadius: DesignTokens.rowRadius))
+        .overlay { RoundedRectangle(cornerRadius: DesignTokens.rowRadius).strokeBorder(palette.border) }
+    }
+
+    /// Path bar of the central column (list and document): history, location and counts.
+    /// It starts at the navigation pane's edge and never covers it.
+    private func locationBar(count: Int) -> some View {
         HStack(spacing: 4) {
-            chrome(.sidebar, symbol: "sidebar.left", label: sidebarVisible && layout != .focus ? "Ocultar barra lateral" : "Mostrar barra lateral")
             chrome(.back, symbol: "chevron.left")
             chrome(.forward, symbol: "chevron.right")
             databaseMenu
             if scope != .all {
-                ChromeSymbol(name: "chevron.right", size: 9).foregroundStyle(.secondary)
+                ChromeSymbol(name: "chevron.right", size: 9).foregroundStyle(palette.textTertiary)
                 Button(scopeTitle) { setScope(scope) }.buttonStyle(.plain).lineLimit(1)
             }
             if let document = currentDocument {
-                ChromeSymbol(name: "chevron.right", size: 9).foregroundStyle(.secondary)
+                ChromeSymbol(name: "chevron.right", size: 9).foregroundStyle(palette.textTertiary)
                 Text(document.displayTitle).lineLimit(1)
             }
+            Rectangle().fill(palette.border).frame(width: DesignTokens.divider, height: 14).padding(.horizontal, 6)
+            Text((count == 1 ? "1 elemento" : "\(count) elementos") + (selection != nil ? ", 1 seleccionado" : ""))
+                .foregroundStyle(palette.textSecondary).lineLimit(1)
             Spacer(minLength: 4)
-            chrome(.search, symbol: "magnifyingglass")
-            chrome(.newTab, symbol: "rectangle.on.rectangle.badge.plus")
-            chrome(.newText, symbol: "square.and.pencil")
-            Menu {
-                ForEach([LibraryCommand.wide, .stacked, .listOnly, .focus]) { command in
-                    Button(command.title) { run(command) }
-                }
-            } label: { ChromeSymbol(name: "rectangle.split.2x1") }
-            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().accessibilityLabel("Disposición")
-            chrome(.results, symbol: "list.bullet", label: listVisible && layout != .focus ? "Ocultar lista" : "Mostrar lista")
-            chrome(.inspector, symbol: "sidebar.right", label: inspectorVisible && layout != .focus ? "Ocultar inspector" : "Mostrar inspector")
-            SettingsLink { ChromeSymbol(name: "gearshape") }
-                .buttonStyle(ChromeButtonStyle()).accessibilityLabel("Ajustes")
         }
-        .font(settings.font(-1)).padding(.horizontal, 12).padding(.top, DesignTokens.windowInset)
-        .frame(minHeight: DesignTokens.headerHeight)
+        .font(settings.font(-1)).padding(.horizontal, 8)
+        .frame(height: DesignTokens.pathBarHeight)
+        .background(palette.background)
     }
 
     private var databaseMenu: some View {
@@ -759,36 +786,31 @@ struct LibraryView: View {
                     if entry.id == database.id { setScope(.all) }
                     else { switchDatabase(to: entry.id) }
                 } label: {
-                    if entry.id == database.id { Label(entry.name, systemImage: "checkmark") }
+                    if entry.id == database.id { Label(entry.name, line: "checkmark") }
                     else { Text(entry.name) }
                 }
             }
             Divider()
             Button(LibraryCommand.newDatabase.title) { run(.newDatabase) }
             Button(LibraryCommand.openDatabase.title) { run(.openDatabase) }
-        } label: { Label(database.name, systemImage: "cylinder").lineLimit(1) }
+        } label: { Label(database.name, line: "cylinder").lineLimit(1) }
             .menuStyle(.borderlessButton).fixedSize()
             .accessibilityLabel("Base de datos activa: \(database.name)")
     }
 
+    /// Editor-style tabs: the active one takes the editor background with a 1 px accent line on
+    /// top; the close button shows on the active tab and under the pointer.
     private var tabBar: some View {
         ScrollView(.horizontal) {
-            HStack(spacing: 1) {
+            HStack(spacing: 0) {
                 ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
                     let location = index == activeTab ? currentLocation : tab.location
-                    HStack(spacing: 4) {
-                        Button(tabTitle(location)) { switchTab(to: index) }.buttonStyle(.plain).lineLimit(1)
-                            .accessibilityAddTraits(index == activeTab ? .isSelected : [])
-                        Button("Cerrar pestaña", systemImage: "xmark") { closeTab(at: index) }
-                            .labelStyle(.iconOnly).buttonStyle(ChromeButtonStyle())
-                    }
-                    .padding(.horizontal, 9)
-                    .background(alignment: .top) {
-                        if index == activeTab { Rectangle().fill(palette.tint).frame(height: DesignTokens.divider) }
-                    }
+                    ChromeTab(title: tabTitle(location), active: index == activeTab,
+                              select: { switchTab(to: index) }, close: { closeTab(at: index) })
+                    Rectangle().fill(palette.border).frame(width: DesignTokens.divider)
                 }
             }
-        }.scrollIndicators(.never).background(palette.sidebar)
+        }.scrollIndicators(.never).frame(height: 30).background(palette.surface)
     }
 
     private var currentDocument: WritingDocument? { selection.flatMap { store.document($0.documentID) } }
@@ -800,9 +822,9 @@ struct LibraryView: View {
                 Spacer()
                 chrome(.inspector, symbol: "xmark", label: "Ocultar inspector")
             }.padding(.horizontal, 12).padding(.top, 5)
-            Picker("Sección del inspector", selection: $inspectorSection) {
-                ForEach(InspectorSection.allCases) { section in Text(section.rawValue).tag(section) }
-            }.pickerStyle(.segmented).labelsHidden().padding(10)
+            ChromeSegmented(title: "Sección del inspector", selection: $inspectorSection,
+                            options: InspectorSection.allCases.map { ($0, $0.rawValue) })
+                .font(settings.font(-1)).padding(10)
             rule
             if let document = currentDocument {
                 ScrollView {
@@ -823,7 +845,7 @@ struct LibraryView: View {
                     }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
-                ContentUnavailableView("Sin selección", systemImage: "sidebar.right")
+                ContentUnavailableView("Sin selección", line: "sidebar.right")
             }
         }.frame(maxHeight: .infinity, alignment: .topLeading).background(palette.sidebar)
     }
@@ -851,10 +873,12 @@ struct LibraryView: View {
                     .id(store.destination(selectedID))
             } else {
                 ContentUnavailableView {
-                    Label("Selecciona un documento", systemImage: "text.alignleft")
+                    Label("Selecciona un documento", line: "text.alignleft")
                 } actions: {
-                    Button(LibraryCommand.newText.title) { run(.newText) }
-                    Button(LibraryCommand.importFiles.title) { run(.importFiles) }
+                    VStack(spacing: 6) {
+                        Button(LibraryCommand.newText.title) { run(.newText) }
+                        Button(LibraryCommand.importFiles.title) { run(.importFiles) }
+                    }
                 }
             }
         }
@@ -898,7 +922,7 @@ struct LibraryView: View {
         guard target != nil || allows(command) else { return }
         switch command {
         case .pageEditor, .pagePreview, .pageBoth, .pageNone, .pageSetup, .pageBreak, .pageGo,
-             .pagePDF, .pagePrint, .pageZoomIn, .pageZoomOut, .pageZoomReset, .pageOutline:
+             .pagePDF, .pagePrint, .pageOutline:
             if let id = (target ?? selection)?.documentID { pageCommand = PageCommandRequest(command: command, document: id) }
         case .saveWorkspace:
             workspaceToRename = nil; workspaceName = ""; editingWorkspaceName = true
@@ -1197,5 +1221,39 @@ private struct CreationForm: View {
         .padding(22)
         .frame(width: 360)
         .onAppear { name = dialog.initialName; nameFocused = true }
+    }
+}
+
+private struct ChromeTab: View {
+    let title: String
+    let active: Bool
+    let select: () -> Void
+    let close: () -> Void
+    @Environment(\.colorScheme) private var scheme
+    @State private var hovering = false
+
+    var body: some View {
+        let palette = WindowPalette(scheme: scheme)
+        HStack(spacing: 6) {
+            Button(action: select) { Text(title).lineLimit(1) }
+                .buttonStyle(.plain)
+                .foregroundStyle(active ? palette.textPrimary : palette.textSecondary)
+                .accessibilityAddTraits(active ? .isSelected : [])
+            Button(action: close) { ChromeSymbol(name: "xmark", size: 12) }
+                .buttonStyle(.plain)
+                .foregroundStyle(palette.textSecondary)
+                .frame(width: 16, height: 16)
+                .opacity(active || hovering ? 1 : 0)
+                .accessibilityLabel("Cerrar pestaña")
+                .help("Cerrar pestaña")
+        }
+        .padding(.leading, 12).padding(.trailing, 8)
+        .frame(maxHeight: .infinity)
+        .background(active ? palette.background : hovering ? palette.hover : .clear)
+        .overlay(alignment: .top) {
+            if active { Rectangle().fill(palette.accent).frame(height: DesignTokens.divider) }
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
     }
 }

@@ -119,7 +119,8 @@ struct DocumentEditor: View {
                                     library: store.fileURL.deletingPathExtension().lastPathComponent,
                                     group: projects.joined(separator: ", "), author: settings.reader.author),
                                  dark: darkPaper, richTextData: document.richTextData,
-                                 imageRoots: store.markdownImageRoots(for: document.id))
+                                 imageRoots: store.markdownImageRoots(for: document.id),
+                                 bodySize: CGFloat(settings.editor.fontSize))
     }
 
     private var shouldRender: Bool { pageViews.mode != .source && pageViews.preview }
@@ -264,20 +265,20 @@ struct DocumentEditor: View {
             if width < 340 {
                 Menu {
                     writingModes(mode)
-                } label: { Image(systemName: "rectangle.split.2x1") }
+                } label: { ChromeSymbol(name: "rectangle.split.2x1") }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                     .accessibilityLabel("Vista de escritura")
             } else {
                 writingModes(mode).labelsHidden().fixedSize()
             }
-            Button { outlineVisible.toggle() } label: { Image(systemName: "list.bullet.indent") }
-                .buttonStyle(.borderless).help("Mostrar u ocultar esquema").accessibilityLabel("Mostrar u ocultar esquema")
+            Button { outlineVisible.toggle() } label: { ChromeSymbol(name: "list.bullet.indent") }
+                .buttonStyle(ChromeButtonStyle()).help("Mostrar u ocultar esquema").accessibilityLabel("Mostrar u ocultar esquema")
                 .popover(isPresented: Binding(get: { !docked && outlineVisible },
                                               set: { if !docked { outlineVisible = $0 } })) {
                     outlinePane.frame(width: 230, height: 330)
                 }
-            Button { showPageSetup = true } label: { Image(systemName: "gearshape") }
-                .buttonStyle(.borderless).help("Configurar página").accessibilityLabel("Configurar página")
+            Button { showPageSetup = true } label: { ChromeSymbol(name: "gearshape") }
+                .buttonStyle(ChromeButtonStyle()).help("Configurar página").accessibilityLabel("Configurar página")
         }
         .padding(.horizontal, 18).padding(.vertical, 10)
     }
@@ -297,8 +298,8 @@ struct DocumentEditor: View {
                 if pageViews.editor {
                     sourceZoomTools(compact: width < 160)
                     if width >= 160 {
-                        Button { showPageRulers.toggle() } label: { Image(systemName: "ruler") }
-                            .buttonStyle(.borderless).help("Mostrar u ocultar reglas")
+                        Button { showPageRulers.toggle() } label: { ChromeSymbol(name: "ruler") }
+                            .buttonStyle(ChromeButtonStyle()).help("Mostrar u ocultar reglas")
                             .accessibilityLabel("Mostrar u ocultar reglas")
                     }
                 }
@@ -315,7 +316,7 @@ struct DocumentEditor: View {
                                 ? SourcePaper(layout: pageLayout, metadata: pageInput.metadata, dark: darkPaper) : nil,
                             richTextData: document.richTextData, onRichEdit: { data, text in
                                 store.update(document.id, deferWrite: true) { $0.richTextData = data; $0.markdown = text }
-                            }, plain: document.plainText == true, zoom: sourceZoom, onZoom: { sourceZoom = $0 }, showsRulers: showPageRulers,
+                            }, plain: document.plainText == true, showsRulers: showPageRulers,
                             onMargins: { layout in store.update(document.id, touch: false) { $0.pageLayout = layout } },
                             onRulerHeight: { sourceRulerHeight = $0 },
                             onViewport: sourceMoved,
@@ -362,8 +363,8 @@ struct DocumentEditor: View {
                             PDFThumbnails(pdf: previewView).frame(width: 105)
                             Divider()
                         }
-                        PaginatedPreview(pages: rendered.pages, display: pageDisplay, zoom: pageZoom,
-                                         destination: previewTarget, onPage: previewMoved, onZoom: { pageZoom = $0 },
+                        PaginatedPreview(pages: rendered.pages, display: pageDisplay,
+                                         destination: previewTarget, onPage: previewMoved,
                                          onView: { previewView = $0 })
                     }.frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -373,7 +374,7 @@ struct DocumentEditor: View {
                 ContinuousMarkdownPreview(input: MarkdownPageInput(source: pageInput.source, plain: pageInput.plain,
                     layout: pageLayout, metadata: pageInput.metadata, dark: scheme == .dark,
                     richTextData: document.richTextData, imageRoots: pageInput.imageRoots,
-                    continuousWidth: max(0, width - 40)),
+                    continuousWidth: max(0, width - 40), bodySize: CGFloat(settings.editor.fontSize)),
                     sourceTarget: continuousTarget, onSource: continuousMoved) { url in
                     if let target = ItemDestination(url: url) { openDocument(target) }
                     else if ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "") {
@@ -386,13 +387,11 @@ struct DocumentEditor: View {
 
     private func sourceZoomTools(compact: Bool) -> some View {
         Menu {
-            zoomButtons($sourceZoom)
-            Divider()
             Button("Ir a página…") { askForPage(preview: false) }
             if compact { Toggle("Mostrar reglas", isOn: $showPageRulers) }
-        } label: { Image(systemName: "viewfinder") }
+        } label: { ChromeSymbol(name: "ellipsis") }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .help("Zoom del editor").accessibilityLabel("Zoom del editor")
+        .help("Opciones de página del editor").accessibilityLabel("Opciones de página del editor")
     }
 
     private var previewTools: some View {
@@ -401,26 +400,16 @@ struct DocumentEditor: View {
                 ForEach(PageDisplay.allCases) { Text($0.rawValue).tag($0) }
             }
             Divider()
-            zoomButtons($pageZoom)
-            Divider()
             Toggle("Mostrar miniaturas", isOn: $showPageThumbnails)
             Button("Ir a página…") { askForPage() }
-        } label: { Image(systemName: "viewfinder") }
+        } label: { ChromeSymbol(name: "ellipsis") }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .help("Zoom y disposición").accessibilityLabel("Zoom y disposición")
-    }
-
-    @ViewBuilder private func zoomButtons(_ zoom: Binding<PageZoom>) -> some View {
-        Button("Ajustar al ancho") { zoom.wrappedValue = .width }
-        Button("Ajustar a la página") { zoom.wrappedValue = .fit }
-        ForEach([50, 75, 100, 125, 150, 200, 300, 400], id: \.self) { value in
-            Button("\(value) %") { zoom.wrappedValue = .percent(value) }
-        }
+        .help("Disposición de la previsualización").accessibilityLabel("Disposición de la previsualización")
     }
 
     private func pageToggle(_ label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: enabled ? "doc.fill" : "doc") }
-            .buttonStyle(.borderless).help(label)
+        Button(action: action) { ChromeSymbol(name: enabled ? "doc.fill" : "doc") }
+            .buttonStyle(ChromeButtonStyle()).help(label)
             .accessibilityLabel(label).accessibilityValue(enabled ? "Activada" : "Desactivada")
     }
 
@@ -469,14 +458,6 @@ struct DocumentEditor: View {
             if command == .pagePrint, document.attachment?.kind == .pdf, let url = store.attachmentURL(for: document) {
                 _ = PDFDocument(url: url)?.printOperation(for: .shared, scalingMode: .pageScaleToFit, autoRotate: true)?.run()
             } else { outputPages(printing: command == .pagePrint) }
-        case .pageZoomReset:
-            if previewVisible { pageZoom = .fit } else { sourceZoom = .fit }
-        case .pageZoomIn, .pageZoomOut:
-            let current = previewVisible ? pageZoom : sourceZoom
-            let zoom: Int = if case .percent(let value) = current { value } else { 100 }
-            let delta = command == .pageZoomIn ? 25 : -25
-            let next = PageZoom.percent(min(400, max(50, zoom + delta)))
-            if previewVisible { pageZoom = next } else { sourceZoom = next }
         default: break
         }
     }
@@ -605,10 +586,9 @@ struct DocumentEditor: View {
             if let url = store.attachmentURL(for: document) {
                 VStack(spacing: 0) {
                     if let extracted = asset.searchText, !extracted.isEmpty {
-                        Picker("Vista", selection: $showExtractedText) {
-                            Text("Vista previa").tag(false)
-                            Text("Texto").tag(true)
-                        }.pickerStyle(.segmented).labelsHidden().frame(width: 230).padding(8)
+                        ChromeSegmented(title: "Vista", selection: $showExtractedText,
+                                        options: [(false, "Vista previa"), (true, "Texto")])
+                            .frame(width: 230).padding(8)
                         if showExtractedText {
                             MarkdownSurface(text: extracted, editable: false, taggable: document.trashedAt == nil,
                                             options: settings.editor, reveal: reveal,
@@ -641,7 +621,7 @@ struct DocumentEditor: View {
     private var documentBar: some View {
         HStack(spacing: 14) {
             if document.trashedAt == nil {
-                Button("Etiquetas", systemImage: "tag") {
+                Button("Etiquetas", line: "tag") {
                     if let showInspector { showInspector(.details) } else { showingDetails.toggle() }
                 }
                     .popover(isPresented: $showingDetails, arrowEdge: .top) {
@@ -649,7 +629,7 @@ struct DocumentEditor: View {
                             { tag in showingDetails = false; reveal(tag) }
                         }).padding(16).frame(width: 350)
                     }
-                Button("Enlaces", systemImage: "link") {
+                Button("Enlaces", line: "link") {
                     if let showInspector { showInspector(.links) } else { showingLinks.toggle() }
                 }
                 .popover(isPresented: $showingLinks, arrowEdge: .top) {
@@ -665,7 +645,7 @@ struct DocumentEditor: View {
                     }.menuStyle(.borderlessButton).fixedSize()
                 }
             } else {
-                Button("Restaurar", systemImage: "arrow.uturn.backward") { setTrashed(false) }
+                Button("Restaurar", line: "arrow.uturn.backward") { setTrashed(false) }
             }
             Spacer()
             if let asset = document.attachment {
@@ -683,13 +663,13 @@ struct DocumentEditor: View {
             }
             Menu {
                 if document.attachment == nil {
-                    Button("Exportar a PDF…", systemImage: "doc") { outputPages(printing: false) }
-                    Button("Imprimir…", systemImage: "printer") { outputPages(printing: true) }
+                    Button("Exportar a PDF…", line: "doc") { outputPages(printing: false) }
+                    Button("Imprimir…", line: "printer") { outputPages(printing: true) }
                 }
-                Button("Exportar…", systemImage: "square.and.arrow.up") { store.exportDocument(document) }
+                Button("Exportar…", line: "square.and.arrow.up") { store.exportDocument(document) }
                 if document.trashedAt == nil {
                     Divider()
-                    Button(LibraryCommand.moveToTrash.title, systemImage: "trash") { setTrashed(true) }
+                    Button(LibraryCommand.moveToTrash.title, line: "trash") { setTrashed(true) }
                 }
             } label: {
                 ChromeSymbol(name: "ellipsis")
@@ -700,7 +680,7 @@ struct DocumentEditor: View {
             .accessibilityLabel("Acciones del texto")
         }
         .font(settings.font(-1))
-        .buttonStyle(.borderless)
+        .buttonStyle(ChromeButtonStyle())
         .foregroundStyle(.secondary)
         .lineLimit(1)
         .padding(.horizontal, 14)
@@ -729,7 +709,7 @@ struct DocumentLinks: View {
         let outgoing = document.linkTargets.sorted { $0.url.absoluteString < $1.url.absoluteString }
         let incoming = active.filter { $0.linkedDocumentIDs.contains(document.id) }.map { ItemDestination($0.id) }
         return VStack(alignment: .leading, spacing: 10) {
-            Button("Copiar enlace Markdown", systemImage: "doc.on.doc") {
+            Button("Copiar enlace Markdown", line: "doc.on.doc") {
                 copyText(store.destination(document.id).markdownLink(label: document.displayTitle))
             }
             Divider()

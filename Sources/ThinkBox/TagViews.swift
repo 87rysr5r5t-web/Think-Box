@@ -21,7 +21,7 @@ struct TagEditor: View {
                                 } else {
                                     Text(tag)
                                 }
-                                Button("Quitar \(tag)", systemImage: "xmark") {
+                                Button("Quitar \(tag)", line: "xmark") {
                                     change(tags.filter { $0 != tag })
                                 }
                                 .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(.secondary)

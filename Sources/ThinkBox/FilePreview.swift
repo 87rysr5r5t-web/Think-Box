@@ -10,9 +10,9 @@ struct FilePreview: View {
                 QuickLookSurface(url: url)
                 HStack {
                     Spacer()
-                    Button("Abrir en app externa", systemImage: "arrow.up.forward.app") {
+                    Button("Abrir en app externa", line: "arrow.up.forward.app") {
                         NSWorkspace.shared.open(url)
-                    }.buttonStyle(.borderless)
+                    }.buttonStyle(ChromeButtonStyle())
                 }.padding(10)
             } else {
                 ContentUnavailableView("Archivo no disponible", systemImage: "doc.questionmark")

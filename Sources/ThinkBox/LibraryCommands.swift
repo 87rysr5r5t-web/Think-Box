@@ -9,14 +9,14 @@ enum LibraryCommand: CaseIterable, Identifiable {
     case results, inspector, wide, stacked, listOnly, focus, back, forward, newTab, closeTab, openWindow
 
     case pageEditor, pagePreview, pageBoth, pageNone, pageSetup, pageBreak, pageGo
-    case pagePDF, pagePrint, pageZoomIn, pageZoomOut, pageZoomReset, pageOutline
+    case pagePDF, pagePrint, pageOutline
 
     var id: Self { self }
 
     var isPageCommand: Bool {
         switch self {
         case .pageEditor, .pagePreview, .pageBoth, .pageNone, .pageSetup, .pageBreak, .pageGo,
-             .pagePDF, .pagePrint, .pageZoomIn, .pageZoomOut, .pageZoomReset, .pageOutline: true
+             .pagePDF, .pagePrint, .pageOutline: true
         default: false
         }
     }
@@ -64,9 +64,6 @@ enum LibraryCommand: CaseIterable, Identifiable {
         case .pageOutline: "Mostrar u ocultar esquema"
         case .pagePDF: "Exportar a PDF…"
         case .pagePrint: "Imprimir…"
-        case .pageZoomIn: "Acercar página"
-        case .pageZoomOut: "Alejar página"
-        case .pageZoomReset: "Ajustar a la página"
         }
     }
 
@@ -94,9 +91,6 @@ enum LibraryCommand: CaseIterable, Identifiable {
         case .pageNone: KeyboardShortcut("0", modifiers: [.command, .option])
         case .pageBreak: KeyboardShortcut(.return, modifiers: [.command])
         case .pagePrint: KeyboardShortcut("p", modifiers: [.command, .option])
-        case .pageZoomIn: KeyboardShortcut("+")
-        case .pageZoomOut: KeyboardShortcut("-")
-        case .pageZoomReset: KeyboardShortcut("0")
         default: nil
         }
     }
@@ -140,7 +134,7 @@ extension AppSettings {
         if let asset = document.attachment { return asset.kind == .pdf && command == .pagePrint }
         let views = writingViews(for: document)
         switch command {
-        case .pageGo, .pageZoomIn, .pageZoomOut, .pageZoomReset:
+        case .pageGo:
             return (views.mode != .preview && views.editor) || (views.mode != .source && views.preview)
         case .pageBreak: return document.trashedAt == nil
         default: return command.isPageCommand
@@ -177,6 +171,7 @@ struct LibraryMenuCommands: Commands {
     var body: some Commands {
         // Estructura de menús siguiendo DEVONthink (MN-FILE, MN-EDIT, MN-DATA, MN-VIEW, MN-GO, MN-TOOLS, MN-WIN).
         // Todas las entradas salen del registro compartido con la paleta y solo se muestran las que existen.
+        CommandGroup(replacing: .appInfo) { AboutMenuItem() }
         CommandGroup(replacing: .newItem) {
             buttons([.newDatabase, .openDatabase])
             Divider()
@@ -204,7 +199,6 @@ struct LibraryMenuCommands: Commands {
             buttons([.focus])
             Divider()
             Menu("Vista de página") { buttons([.pageEditor, .pagePreview, .pageBoth, .pageNone]) }
-            Menu("Zoom") { buttons([.pageZoomIn, .pageZoomOut, .pageZoomReset]) }
         }
         CommandMenu("Ir") {
             buttons([.back, .forward])
@@ -226,7 +220,7 @@ struct LibraryMenuCommands: Commands {
         ForEach(commands) { command in
             let active = command.isPageCommand ? pageContext : context
             Button { active?.run(command) } label: {
-                if active?.isSelected(command) == true { Label(command.title, systemImage: "checkmark") }
+                if active?.isSelected(command) == true { Label(command.title, line: "checkmark") }
                 else { Text(command.title) }
             }
                 .keyboardShortcut(command.shortcut)
@@ -303,4 +297,17 @@ struct CommandPalette: View {
         selected = results[min(results.count - 1, max(0, index + delta))].id
     }
 
+}
+
+/// «Acerca de Think-Box» in the app menu (MN-APP-01): brings the library window forward and
+/// opens the same panel as the toolbar button.
+struct AboutMenuItem: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Acerca de \(AppInfo.name)") {
+            openWindow(id: "library")
+            AboutPresenter.shared.visible = true
+        }
+    }
 }

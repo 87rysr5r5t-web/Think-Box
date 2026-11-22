@@ -26,8 +26,8 @@ struct StandaloneDocument: View {
                 VStack(spacing: 0) {
                     HStack {
                         Spacer()
-                        Button("Inspector", systemImage: "sidebar.right") { inspectorVisible.toggle() }
-                            .labelStyle(.iconOnly).help("Mostrar u ocultar inspector")
+                        Button("Inspector", line: "sidebar.right") { inspectorVisible.toggle() }
+                            .labelStyle(.iconOnly).buttonStyle(ChromeButtonStyle()).help("Mostrar u ocultar inspector")
                     }.padding(8)
                     GeometryReader { geometry in
                         HStack(spacing: 0) {
@@ -100,7 +100,7 @@ struct StandaloneDocument: View {
                     Button("Aceptar", role: .cancel) { store.actionError = nil }
                 } message: { Text(store.actionError ?? "") }
             } else {
-                ContentUnavailableView("Documento no disponible", systemImage: "doc")
+                ContentUnavailableView("Documento no disponible", line: "doc")
             }
         }
     }

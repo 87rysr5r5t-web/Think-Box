@@ -28,6 +28,9 @@ struct MarkdownPageInput: Equatable, Sendable {
     var richTextData: Data? = nil
     var imageRoots: [URL] = []
     var continuousWidth: CGFloat? = nil
+    /// Body text size in points. The editor passes its own font size so both panels show text
+    /// at the same size (F2-R09); headings, code and notes scale from it.
+    var bodySize: CGFloat = 12
 }
 
 struct MarkdownPages: Sendable {
@@ -106,13 +109,13 @@ enum MarkdownPagination {
             }
         }
 
-        func text(for keys: [String], ink: NSColor) -> NSAttributedString {
+        func text(for keys: [String], ink: NSColor, body: CGFloat) -> NSAttributedString {
             let output = NSMutableAttributedString()
             for key in keys {
                 guard let number = numbers[key], let content = definitions[key] else { continue }
                 if output.length > 0 { output.append(NSAttributedString(string: "\n")) }
-                let value = paragraph("\(number). \(content)", literal: false, code: false, newline: false, ink: ink)
-                value.addAttribute(.font, value: NSFont.systemFont(ofSize: 10), range: NSRange(location: 0, length: value.length))
+                let value = paragraph("\(number). \(content)", literal: false, code: false, newline: false, ink: ink, body: body)
+                value.addAttribute(.font, value: NSFont.systemFont(ofSize: (body * 10 / 12).rounded()), range: NSRange(location: 0, length: value.length))
                 output.append(value)
             }
             return output
@@ -139,7 +142,7 @@ enum MarkdownPagination {
         if !notes.numbers.isEmpty {
             rendered.append(NSAttributedString(string: "\n\n"))
             rendered.append(notes.text(for: notes.numbers.keys.sorted { notes.numbers[$0]! < notes.numbers[$1]! },
-                                       ink: ink(for: input)))
+                                       ink: ink(for: input), body: input.bodySize))
         }
         return rendered
     }
@@ -188,7 +191,7 @@ enum MarkdownPagination {
                     var reserved: CGFloat = 0
                     while true {
                         let keys = noteKeys(in: columns.map(\.range), manager: manager, storage: storage)
-                        let text = notes.text(for: keys, ink: ink(for: input))
+                        let text = notes.text(for: keys, ink: ink(for: input), body: input.bodySize)
                         footnotes = layoutNotes(text, rect: rect)
                         guard let first = footnotes.first else { break }
                         let needed = rect.maxY - first.origin.y + 11
@@ -509,7 +512,7 @@ enum MarkdownPagination {
                     let rowOffset = lines[index + (row == 0 ? 0 : row + 1)].start
                     offsets.append((rowOffset, text.length))
                     for (column, cell) in cells.enumerated() {
-                        let cellText = paragraph(cell, literal: false, code: false, newline: true, ink: ink)
+                        let cellText = paragraph(cell, literal: false, code: false, newline: true, ink: ink, body: input.bodySize)
                         notes.replaceReferences(in: cellText)
                         let range = NSRange(location: 0, length: cellText.length)
                         cellText.addAttributes([
@@ -528,12 +531,12 @@ enum MarkdownPagination {
                     if line.newline { text.append(NSAttributedString(string: "\n")) }
                 } else {
                     let alt = image.alt.isEmpty ? "Imagen no disponible" : "Imagen no disponible · \(image.alt)"
-                    text.append(paragraph(alt, literal: true, code: false, newline: line.newline, ink: ink))
+                    text.append(paragraph(alt, literal: true, code: false, newline: line.newline, ink: ink, body: input.bodySize))
                 }
             } else {
                 offsets.append((line.start, text.length))
                 let rendered = paragraph(line.text, literal: input.plain || line.code, code: line.code,
-                                         newline: line.newline, ink: ink)
+                                         newline: line.newline, ink: ink, body: input.bodySize)
                 if !line.code && line.text.contains("[^") { notes.replaceReferences(in: rendered) }
                 text.append(rendered)
             }
@@ -546,7 +549,7 @@ enum MarkdownPagination {
     private static let inlineSyntax = CharacterSet(charactersIn: "*_~[]<>&\\" + String(UnicodeScalar(96)))
 
     private static func paragraph(_ line: String, literal: Bool, code: Bool, newline: Bool,
-                                  ink: NSColor) -> NSMutableAttributedString {
+                                  ink: NSColor, body: CGFloat) -> NSMutableAttributedString {
         var value = line
         var heading = 0
         let paragraph = NSMutableParagraphStyle()
@@ -564,8 +567,9 @@ enum MarkdownPagination {
                     + line[match.range.upperBound...]
             }
         }
-        let size: CGFloat = heading == 0 ? 12 : max(14, 23 - CGFloat(heading * 2))
-        let base = code ? NSFont.monospacedSystemFont(ofSize: size - 1, weight: .regular)
+        let scale = body / 12
+        let size: CGFloat = heading == 0 ? body : (max(14, 23 - CGFloat(heading * 2)) * scale).rounded()
+        let base = code ? NSFont.monospacedSystemFont(ofSize: size - scale, weight: .regular)
             : NSFont.systemFont(ofSize: size, weight: heading == 0 ? .regular : .semibold)
         let result = NSMutableAttributedString()
         if !literal, value.rangeOfCharacter(from: inlineSyntax) != nil,

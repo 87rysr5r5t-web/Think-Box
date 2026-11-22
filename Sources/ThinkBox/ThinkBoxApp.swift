@@ -11,7 +11,10 @@ struct ThinkBoxApp: App {
     @ViewState private var databases = LibraryDatabases()
     @ViewState private var settings = AppSettings()
 
-    init() { AppFonts.register() }
+    init() {
+        AppAccent.install()
+        AppFonts.register()
+    }
 
     var body: some Scene {
         Window("Think Box", id: "library") {
@@ -25,12 +28,16 @@ struct ThinkBoxApp: App {
                 .environment(settings)
                 .font(settings.font())
                 .symbolRenderingMode(.monochrome)
+                .themedWindow()
                 .preferredColorScheme(settings.appearance.theme.colorScheme)
                 .environment(\.locale, Locale(identifier: "es_ES"))
         }
         .defaultSize(width: 1200, height: 760)
-        .windowStyle(.hiddenTitleBar)
-        .commands { LibraryMenuCommands() }
+        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
+        .commands {
+            LibraryMenuCommands()
+            ToolbarCommands()
+        }
 
         WindowGroup("Documento", id: "document", for: ItemDestination.self) { destination in
             StandaloneDocument(databases: databases, destination: destination.wrappedValue)
@@ -39,12 +46,14 @@ struct ThinkBoxApp: App {
                 .environment(settings)
                 .font(settings.font())
                 .symbolRenderingMode(.monochrome)
+                .themedWindow()
                 .preferredColorScheme(settings.appearance.theme.colorScheme)
                 .environment(\.locale, Locale(identifier: "es_ES"))
         }.defaultSize(width: 850, height: 700)
 
         Settings {
             SettingsView(settings: settings, store: databases.activeStore)
+                .themedWindow()
                 .preferredColorScheme(settings.appearance.theme.colorScheme)
                 .environment(\.locale, Locale(identifier: "es_ES"))
         }
