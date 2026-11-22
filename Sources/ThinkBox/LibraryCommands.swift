@@ -175,38 +175,51 @@ struct LibraryMenuCommands: Commands {
     @FocusedValue(\.pageCommands) private var pageContext
 
     var body: some Commands {
+        // Estructura de menús siguiendo DEVONthink (MN-FILE, MN-EDIT, MN-DATA, MN-VIEW, MN-GO, MN-TOOLS, MN-WIN).
+        // Todas las entradas salen del registro compartido con la paleta y solo se muestran las que existen.
         CommandGroup(replacing: .newItem) {
-            Menu("Nuevo") { buttons([.newDatabase]) }
-            buttons([.openDatabase, .openWindow])
+            buttons([.newDatabase, .openDatabase])
             Divider()
-            Menu("Importar") { buttons([.importFiles]) }
-            Menu("Exportar") { buttons([.exportFile, .pagePDF]) }
+            buttons([.newTab, .openWindow, .closeTab])
+            Divider()
+            buttons([.importFiles, .exportFile, .pagePDF])
         }
-        CommandGroup(replacing: .printItem) { buttons([.pagePrint]) }
-        CommandGroup(after: .pasteboard) { buttons([.copyLink, .search]) }
+        CommandGroup(replacing: .printItem) {
+            buttons([.pageSetup])
+            buttons([.pagePrint])
+        }
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            buttons([.copyLink])
+        }
         CommandMenu("Datos") {
             Menu("Nuevo") { buttons([.newText, .newCanvas, .newProject, .newTag]) }
             Divider()
             buttons([.moveToTrash, .putBack])
         }
         CommandMenu("Formato") { buttons([.pageSetup, .pageBreak]) }
-        CommandMenu("Herramientas") {
-            Menu("Inspectores") { buttons([.inspector]) }
-            buttons([.palette])
-        }
         CommandGroup(after: .sidebar) {
-            buttons([.sidebar, .results, .pageOutline])
-            Menu("Disposición") { buttons([.wide, .stacked, .listOnly, .focus]) }
+            Menu("Mostrar/Ocultar") { buttons([.sidebar, .results, .inspector, .pageOutline]) }
+            Menu("Disposición") { buttons([.wide, .stacked, .listOnly]) }
+            buttons([.focus])
+            Divider()
             Menu("Vista de página") { buttons([.pageEditor, .pagePreview, .pageBoth, .pageNone]) }
-            Menu("Zoom de página") { buttons([.pageZoomIn, .pageZoomOut, .pageZoomReset]) }
+            Menu("Zoom") { buttons([.pageZoomIn, .pageZoomOut, .pageZoomReset]) }
         }
         CommandMenu("Ir") {
-            buttons([.back, .forward, .goTo, .pageGo])
+            buttons([.back, .forward])
+            Divider()
+            buttons([.goTo, .pageGo])
             Divider()
             buttons([.inbox, .trash])
-            Menu("Espacios de trabajo") { buttons([.saveWorkspace, .restoreWorkspace, .manageWorkspaces]) }
         }
-        CommandGroup(before: .windowArrangement) { buttons([.newTab, .closeTab]) }
+        CommandMenu("Herramientas") {
+            buttons([.search, .palette])
+        }
+        CommandGroup(before: .windowArrangement) {
+            Menu("Espacios de trabajo") { buttons([.saveWorkspace, .restoreWorkspace, .manageWorkspaces]) }
+            Divider()
+        }
     }
 
     private func buttons(_ commands: [LibraryCommand]) -> some View {

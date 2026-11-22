@@ -15,16 +15,19 @@ struct SavedWindowFrame: Codable {
         height = frame.height
     }
 
+    /// Frame guardado ajustado al área visible dada, respetando el tamaño mínimo mientras quepa.
+    func fitted(to visible: NSRect, minimum: NSSize) -> NSRect {
+        let width = min(max(minimum.width, self.width), visible.width)
+        let height = min(max(minimum.height, self.height), visible.height)
+        return NSRect(x: min(max(x, visible.minX), visible.maxX - width),
+                      y: min(max(y, visible.minY), visible.maxY - height),
+                      width: width, height: height)
+    }
+
     @MainActor func apply(to window: NSWindow) {
-        let minimum = window.minSize
-        let proposed = NSRect(x: x, y: y, width: max(minimum.width, width), height: max(minimum.height, height))
+        let proposed = NSRect(x: x, y: y, width: width, height: height)
         let screen = NSScreen.screens.first { $0.visibleFrame.intersects(proposed) } ?? NSScreen.main
-        let visible = screen?.visibleFrame ?? proposed
-        let width = min(proposed.width, visible.width)
-        let height = min(proposed.height, visible.height)
-        window.setFrame(NSRect(x: min(max(proposed.minX, visible.minX), visible.maxX - width),
-                               y: min(max(proposed.minY, visible.minY), visible.maxY - height),
-                               width: width, height: height), display: true)
+        window.setFrame(fitted(to: screen?.visibleFrame ?? proposed, minimum: window.minSize), display: true)
     }
 }
 
