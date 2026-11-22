@@ -260,3 +260,60 @@ import WritingLibrary
     #expect(editor.string == original)
     window.contentView = nil
 }
+
+/// Cuenta las líneas de cada párrafo `p{i}w{k}` en cada página del PDF compuesto.
+@MainActor private func paragraphLines(in pdf: PDFDocument) -> [Int: [(page: Int, lines: Int)]] {
+    var result: [Int: [(page: Int, lines: Int)]] = [:]
+    for page in 0..<pdf.pageCount {
+        for line in (pdf.page(at: page)?.string ?? "").split(whereSeparator: \.isNewline) {
+            let ids = Set(line.split(separator: " ").compactMap { token -> Int? in
+                guard token.hasPrefix("p"), let marker = token.firstIndex(of: "w") else { return nil }
+                return Int(token[token.index(after: token.startIndex)..<marker])
+            })
+            for id in ids {
+                if var parts = result[id], parts.last?.page == page {
+                    parts[parts.count - 1].lines += 1
+                    result[id] = parts
+                } else {
+                    result[id, default: []].append((page, 1))
+                }
+            }
+        }
+    }
+    return result
+}
+
+@Test @MainActor func paragraphsNeverLeaveASingleLineAtEitherPageEdge() throws {
+    for words in [35, 45, 60] {
+        for lead in 0..<45 {
+            var source = (0..<lead).map { "filler\($0)" }.joined(separator: "\n\n") + (lead > 0 ? "\n\n" : "")
+            for index in 0..<12 { source += (0..<words).map { "p\(index)w\($0)" }.joined(separator: " ") + "\n\n" }
+            let pages = try #require(MarkdownPagination.render(input(source)))
+            let pdf = try #require(PDFDocument(data: pages.data))
+            for (id, parts) in paragraphLines(in: pdf) where parts.count > 1 {
+                #expect(parts.allSatisfy { $0.lines >= 2 }, "p\(id) con \(words) palabras y \(lead) párrafos previos: \(parts.map(\.lines))")
+            }
+        }
+    }
+}
+
+@Test @MainActor func aHeadingIsNeverLeftAloneAtTheEndOfAPage() throws {
+    for lead in 0..<60 {
+        var source = (0..<lead).map { "filler\($0)" }.joined(separator: "\n\n") + "\n\n"
+        for index in 0..<6 {
+            source += "## Titulo\(index)\n\n" + (0..<40).map { "p\(index)w\($0)" }.joined(separator: " ") + "\n\n"
+        }
+        let pages = try #require(MarkdownPagination.render(input(source)))
+        let pdf = try #require(PDFDocument(data: pages.data))
+        #expect(pages.starts.count == pdf.pageCount)
+        var text = ""
+        for page in 0..<pdf.pageCount {
+            let body = (pdf.page(at: page)?.string ?? "").split(whereSeparator: \.isNewline).dropLast()
+            text += body.joined(separator: "\n") + "\n"
+            if page < pdf.pageCount - 1 {
+                #expect(body.last?.hasPrefix("Titulo") != true, "Título solo al final de la página \(page) con \(lead) párrafos previos")
+            }
+        }
+        for index in 0..<6 { #expect(text.contains("Titulo\(index)") && text.contains("p\(index)w39")) }
+    }
+}

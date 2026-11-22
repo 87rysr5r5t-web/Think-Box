@@ -324,6 +324,37 @@ enum MarkdownPagination {
 
     private static func fitColumn(_ container: NSTextContainer, in manager: NSLayoutManager,
                                   storage: NSTextStorage) -> NSRange {
+        var range = fitColumnBody(container, in: manager, storage: storage)
+        // Los ajustes anteriores pueden mover un párrafo entero y dejar su título solo al final.
+        var guardCount = 0
+        while guardCount < 4, range.length > 0, NSMaxRange(range) < manager.numberOfGlyphs {
+            guardCount += 1
+            var character = manager.characterIndexForGlyph(at: NSMaxRange(range) - 1)
+            var line = storage.mutableString.paragraphRange(for: NSRange(location: character, length: 0))
+            while line.location > 0,
+                  storage.mutableString.substring(with: line).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                character = line.location - 1
+                line = storage.mutableString.paragraphRange(for: NSRange(location: character, length: 0))
+            }
+            guard storage.attribute(headingAttribute, at: line.location, effectiveRange: nil) != nil else { break }
+            let firstGlyph = manager.glyphIndexForCharacter(at: line.location)
+            guard firstGlyph > range.location else { break }
+            let top = manager.lineFragmentRect(forGlyphAt: firstGlyph, effectiveRange: nil).minY
+            guard top > 0 else { break }
+            let original = container.size
+            container.size.height = top
+            let adjusted = manager.glyphRange(for: container)
+            if adjusted.length == 0 || adjusted == range {
+                container.size = original
+                break
+            }
+            range = adjusted
+        }
+        return range
+    }
+
+    private static func fitColumnBody(_ container: NSTextContainer, in manager: NSLayoutManager,
+                                      storage: NSTextStorage) -> NSRange {
         let range = manager.glyphRange(for: container)
         guard range.length > 0, NSMaxRange(range) < manager.numberOfGlyphs else { return range }
         let lastGlyph = NSMaxRange(range) - 1
@@ -372,10 +403,25 @@ enum MarkdownPagination {
         let singleLineOnNextPage = NSMaxRange(nextLine) >= NSMaxRange(paragraphGlyphs)
             && NSMaxRange(range) < NSMaxRange(paragraphGlyphs)
         if singleLineOnNextPage && lastLine.location > range.location && lastLine.location > firstGlyph {
-            let previousRect = manager.lineFragmentRect(forGlyphAt: lastLine.location, effectiveRange: nil)
-            container.size.height = previousRect.minY
-            let adjusted = manager.glyphRange(for: container)
-            if adjusted.length > 0 { return adjusted }
+            // Evitar la viuda no debe crear una huérfana: con menos de tres líneas en esta página,
+            // el párrafo entero pasa a la siguiente; con tres o más, solo baja la última línea.
+            var linesHere = 0
+            manager.enumerateLineFragments(forGlyphRange: NSRange(location: firstGlyph, length: NSMaxRange(range) - firstGlyph)) { _, _, _, _, _ in
+                linesHere += 1
+            }
+            if linesHere >= 3 {
+                let previousRect = manager.lineFragmentRect(forGlyphAt: lastLine.location, effectiveRange: nil)
+                container.size.height = previousRect.minY
+                let adjusted = manager.glyphRange(for: container)
+                if adjusted.length > 0 { return adjusted }
+            } else if rect.minY > 0 {
+                let originalSize = container.size
+                container.size.height = rect.minY
+                let adjusted = manager.glyphRange(for: container)
+                if adjusted.length > 0 { return adjusted }
+                container.size = originalSize
+                return manager.glyphRange(for: container)
+            }
         }
         guard rect.minY > 0, (heading && hasFollowingContent) || wrapsToNextColumn else { return range }
         let originalSize = container.size
