@@ -112,6 +112,19 @@ Referencias: la estructura y el comportamiento de la barra superior y de los pan
 - Un grupo muestra solo sus propios documentos, no los de sus subgrupos.
 - Pruebas: `NestedGroupsTests`. Esto adelanta parte de UI-07 («Subir al grupo contenedor» ya tiene jerarquía en la que apoyarse).
 
+### Acabados — 22 de noviembre
+
+- **Redimensionar paneles:** todos los bordes deslizables (barra lateral, lista a la izquierda o arriba, inspector y esquema) muestran el cursor de redimensionar al pasar por encima y se arrastran con una zona de agarre de 8 pt. El esquema ya no tiene ancho fijo (150–360 pt, recordado). El reparto editor/previsualización sigue al 50 % para que las dos hojas coincidan.
+- **Pantalla completa:** macOS dibuja allí la barra de herramientas en una ventana propia; ahora la barra pinta ella misma la superficie, con el color y el grano de la ventana (`TintedSurface.paint`).
+- **Icono de documento de texto:** una página con líneas (`doc.text`) en lugar de tres rayas, en la lista, en la vista de iconos y en el estado vacío.
+- **Repaso estético:** título y fecha con la misma tipografía en las filas estrechas; los grupos y etiquetas sin flecha se alinean con los que la tienen; separador entre los botones de modo y el resto en la cabecera del documento; estado vacío con icono grande y tenue.
+
+### Zoom por modo — 22 de noviembre
+
+- **Editor solo, con vista de página:** el pellizco amplía y reduce la hoja; un doble toque con dos dedos alterna entre el ancho ajustado y 1,5×.
+- **Previsualización sola:** el pellizco también amplía y reduce, y comunica la escala a los botones de la cabecera para que sigan desde ella.
+- **Vista dividida:** sin pellizco en ninguno de los dos paneles; solo los botones de la previsualización. Al entrar en la vista dividida, la previsualización vuelve a la escala del editor y el editor vuelve a su ancho ajustado.
+
 ### Archivos implicados
 - `Sources/ThinkBox/LibraryView.swift`: barra superior, pestañas, inspector, lista y barra lateral.
 - `Sources/ThinkBox/WindowChrome.swift`: tokens, `WindowPalette`, `ChromeButtonStyle` y `ChromeSymbol`.

@@ -31,6 +31,7 @@ struct LibraryView: View {
     @ViewState private var inspectorSection = InspectorSection.details
     @ViewState private var lastLayout = WorkspaceLayout.wide
     @ViewState private var swipePreview: (pane: SwipePane, extent: CGFloat)?
+    @ViewState private var fullScreen = false
     @SceneStorage("workspace.sidebarVisible") private var savedSidebarVisible: Bool?
     @SceneStorage("workspace.sidebarWidth") private var savedSidebarWidth: Int?
     @SceneStorage("workspace.layout") private var layoutsData = Data()
@@ -105,6 +106,16 @@ struct LibraryView: View {
         .background { MainWindowTracker() }
         .overlay { AboutOverlay() }
         .toolbar(id: "library") { libraryToolbar }
+        // In full screen macOS draws the toolbar in a window of its own, out of reach of the
+        // background above; there the toolbar paints the same surface (colour and grain) itself.
+        .toolbarBackground(TintedSurface.paint(settings.tint, dark: scheme == .dark), for: .windowToolbar)
+        .toolbarBackground(fullScreen ? .visible : .automatic, for: .windowToolbar)
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { note in
+            if (note.object as? NSWindow) === WorkspaceWindows.shared.mainWindow { fullScreen = true }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { note in
+            if (note.object as? NSWindow) === WorkspaceWindows.shared.mainWindow { fullScreen = false }
+        }
         .toolbarRole(.editor)
         .focusedSceneValue(\.libraryCommands, LibraryCommandContext(allows: allows, run: { run($0) },
                                                                     isSelected: isSelected))
@@ -529,14 +540,14 @@ struct LibraryView: View {
         HStack(spacing: 6) {
             ChromeSymbol(name: hit.fragment != nil ? "quote.opening" : documentSymbol(hit.document), size: 12)
                 .foregroundStyle(palette.textSecondary)
-            Text(hit.fragment?.quote ?? listTitle(hit.document)).lineLimit(1)
+            // Title and date in the same family, so the row reads as one line.
+            Text(hit.fragment?.quote ?? listTitle(hit.document)).font(settings.font(-1, list: true)).lineLimit(1)
             Spacer(minLength: 4)
             if settings.list.showDates {
                 Text(hit.document.modifiedAt, format: .dateTime.day().month(.abbreviated))
-                    .font(settings.font(-2, list: true)).foregroundStyle(.secondary)
+                    .font(settings.font(-2, list: true)).monospacedDigit().foregroundStyle(.secondary)
             }
         }
-        .font(settings.font(-1, list: true))
         .padding(.vertical, 1)
     }
 
@@ -602,7 +613,7 @@ struct LibraryView: View {
         case .pdf: "doc"
         case .canvas: "rectangle.dashed"
         case .preview: "doc.on.doc"
-        case nil: "text.alignleft"
+        case nil: "doc.text"
         }
     }
 
@@ -1046,7 +1057,11 @@ struct LibraryView: View {
                     .id(store.destination(selectedID))
             } else {
                 ContentUnavailableView {
-                    Label("Selecciona un documento", line: "text.alignleft")
+                    VStack(spacing: 10) {
+                        ChromeSymbol(name: "doc.text", size: 34).foregroundStyle(palette.textTertiary.opacity(0.7))
+                        Text("Selecciona un documento").font(settings.font(1, bold: true)).foregroundStyle(palette.textSecondary)
+                    }
+                    .accessibilityElement(children: .combine)
                 } actions: {
                     VStack(spacing: 6) {
                         Button(LibraryCommand.newText.title) { run(.newText) }

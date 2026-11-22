@@ -32,6 +32,8 @@ struct MarkdownSurface: NSViewRepresentable {
     var onRichEdit: ((Data, String) -> Void)? = nil
     var plain = false
     var showsRulers = false
+    /// Pinch zoom of the sheet (the editor shown alone, in page view).
+    var allowsZoom = false
     var onMargins: ((WritingPageLayout) -> Void)? = nil
     var onRulerHeight: ((CGFloat) -> Void)? = nil
     var onViewport: ((Int, Int, Int) -> Void)? = nil
@@ -108,6 +110,15 @@ struct MarkdownSurface: NSViewRepresentable {
         editor.pageFlow?.plain = plain
         if let sourceScroll = scroll as? SourceScrollView {
             sourceScroll.allowsMagnification = false
+            sourceScroll.allowsPinch = allowsZoom && paper != nil
+            sourceScroll.onZoom = { [weak editor, weak sourceScroll] in
+                guard let editor, let sourceScroll else { return }
+                editor.updatePaperFrame(in: sourceScroll, refreshPageCount: false)
+            }
+            if !sourceScroll.allowsPinch && sourceScroll.zoomFactor != 1 {
+                sourceScroll.zoomFactor = 1
+                if paper != nil { editor.updatePaperFrame(in: sourceScroll, refreshPageCount: false) }
+            }
             if paper == nil && sourceScroll.magnification != 1 { sourceScroll.magnification = 1 }
         }
         editor.showsPageRulers = showsRulers
@@ -369,10 +380,11 @@ struct MarkdownSurface: NSViewRepresentable {
             let size = paper.layout.paperSize
             let stride = size.height + Self.pageGap
             let clipSize = scroll.contentView.frame.size
-            // F2-R08: the sheet always fills the panel width minus a ~3 mm border on each side.
-            // There is no user zoom (F2-R07); saved zoom values are read but ignored.
+            // F2-R08: the sheet fills the panel width minus a ~3 mm border on each side, times the
+            // pinch zoom when the editor is shown alone (`SourceScrollView.zoomFactor`).
             if clipSize.width > 80 && clipSize.height > 80 {
-                let scale = max(0.05, (clipSize.width - DesignTokens.pageBorder * 2) / size.width)
+                let zoom = (scroll as? SourceScrollView)?.zoomFactor ?? 1
+                let scale = max(0.05, (clipSize.width - DesignTokens.pageBorder * 2) / size.width * zoom)
                 let adjusted = min(scroll.maxMagnification, max(scroll.minMagnification, scale))
                 if abs(scroll.magnification - adjusted) > 0.002 { scroll.magnification = adjusted }
             }
@@ -733,9 +745,25 @@ private final class SourceTextContainer: NSTextContainer {
 
 
 private final class SourceScrollView: NSScrollView {
-    /// Pinch does nothing: the sheet scale is fixed by the panel width (F2-R07).
-    override func magnify(with event: NSEvent) {}
-    override func smartMagnify(with event: NSEvent) {}
+    /// Pinch zooms the sheet only where the owner allows it (the editor alone, in page view);
+    /// in split view the sheet keeps the panel width so it matches the preview.
+    var allowsPinch = false
+    /// Scale relative to the fitted sheet (1 = panel width minus the border).
+    var zoomFactor: CGFloat = 1
+    var onZoom: (() -> Void)?
+
+    override func magnify(with event: NSEvent) {
+        guard allowsPinch else { return }
+        zoomFactor = min(4, max(0.5, zoomFactor * (1 + event.magnification)))
+        onZoom?()
+    }
+
+    /// Two-finger double tap: back to the fitted sheet, or a step closer from it.
+    override func smartMagnify(with event: NSEvent) {
+        guard allowsPinch else { return }
+        zoomFactor = abs(zoomFactor - 1) < 0.01 ? 1.5 : 1
+        onZoom?()
+    }
 }
 
 

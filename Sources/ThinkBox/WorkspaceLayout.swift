@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import WritingLibrary
 
@@ -55,20 +56,36 @@ struct WorkspaceDivider: View {
     var resize: (CGFloat) -> Void
     var toggle: () -> Void
     @ViewState private var dragStart: CGFloat?
+    @ViewState private var cursorShown = false
 
     var body: some View {
         Rectangle().fill(color)
             .frame(width: vertical ? DesignTokens.divider : nil, height: vertical ? nil : DesignTokens.divider)
             .overlay {
-                Color.clear.frame(width: vertical ? 6 : nil, height: vertical ? nil : 6)
-                    .contentShape(Rectangle()).onTapGesture(count: 2, perform: toggle)
+                Color.clear.frame(width: vertical ? 8 : nil, height: vertical ? nil : 8)
+                    .contentShape(Rectangle())
+                    // The resize cursor shows over the edge and stays while dragging past it.
+                    .onHover { inside in
+                        if inside && !cursorShown {
+                            (vertical ? NSCursor.resizeLeftRight : NSCursor.resizeUpDown).push()
+                            cursorShown = true
+                        } else if !inside && cursorShown && dragStart == nil {
+                            NSCursor.pop()
+                            cursorShown = false
+                        }
+                    }
+                    .onDisappear { if cursorShown { NSCursor.pop(); cursorShown = false } }
+                    .onTapGesture(count: 2, perform: toggle)
                     .gesture(DragGesture(minimumDistance: 2, coordinateSpace: .global)
                         .onChanged { motion in
                             if dragStart == nil { dragStart = extent }
                             let change = vertical ? motion.translation.width : motion.translation.height
                             resize((dragStart ?? extent) + change)
                         }
-                        .onEnded { _ in dragStart = nil })
+                        .onEnded { _ in
+                            dragStart = nil
+                            if cursorShown { NSCursor.pop(); cursorShown = false }
+                        })
             }
             .accessibilityHidden(true)
     }
