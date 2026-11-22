@@ -203,23 +203,19 @@ struct LibraryView: View {
         (try? JSONDecoder().decode([SavedWorkspace].self, from: savedWorkspacesData)) ?? []
     }
 
-    private var workspaceMenu: some View {
-        Menu {
-            Button(LibraryCommand.saveWorkspace.title) { run(.saveWorkspace) }
-            Button(LibraryCommand.manageWorkspaces.title) { run(.manageWorkspaces) }
-            if !savedWorkspaces.isEmpty { Divider() }
-            ForEach(savedWorkspaces) { workspace in
-                Menu(workspace.name) {
-                    Button("Restaurar") { restoreWorkspace(workspace) }
-                    Button("Renombrar…") {
-                        workspaceToRename = workspace.id; workspaceName = workspace.name; editingWorkspaceName = true
-                    }
-                    Button("Eliminar", role: .destructive) { deleteWorkspace(workspace) }
+    @ViewBuilder private var workspaceMenuItems: some View {
+        Button(LibraryCommand.saveWorkspace.title) { run(.saveWorkspace) }
+        Button(LibraryCommand.manageWorkspaces.title) { run(.manageWorkspaces) }
+        if !savedWorkspaces.isEmpty { Divider() }
+        ForEach(savedWorkspaces) { workspace in
+            Menu(workspace.name) {
+                Button("Restaurar") { restoreWorkspace(workspace) }
+                Button("Renombrar…") {
+                    workspaceToRename = workspace.id; workspaceName = workspace.name; editingWorkspaceName = true
                 }
+                Button("Eliminar", role: .destructive) { deleteWorkspace(workspace) }
             }
-        } label: { Label("Espacios de trabajo", line: "rectangle.on.rectangle") }
-            .labelStyle(.iconOnly).chromeMenu()
-            .help("Espacios de trabajo")
+        }
     }
 
     private func deleteWorkspace(_ workspace: SavedWorkspace) {
@@ -693,42 +689,59 @@ struct LibraryView: View {
     /// every pane and holds the window controls. Groups by function: panels and list view,
     /// creation, search, inspector. Customisable from Visualización → Personalizar barra de herramientas.
     @ToolbarContentBuilder private var libraryToolbar: some CustomizableToolbarContent {
+        // Toolbar items use the system's own toolbar rendering (hover, pressed and grouping),
+        // so they line up with the window controls; only the icons are Think Box's.
         ToolbarItem(id: "about", placement: .navigation) { AboutButton() }
         ToolbarItem(id: "sidebar", placement: .navigation) {
-            chrome(.sidebar, symbol: "sidebar.left", label: sidebarVisible && layout != .focus ? "Ocultar barra lateral" : "Mostrar barra lateral",
-                   active: sidebarVisible && layout != .focus)
+            toolbarToggle(.sidebar, symbol: "sidebar.left", title: "Barra lateral")
         }
         ToolbarItem(id: "listView", placement: .navigation) {
-            HStack(spacing: 2) {
-                chrome(.wide, symbol: "rectangle.split.2x1", label: "Lista a la izquierda", active: layout == .wide)
-                chrome(.stacked, symbol: "rectangle.split.1x2", label: "Lista arriba", active: layout == .stacked)
-                chrome(.listOnly, symbol: "list.bullet.rectangle", label: "Lista en el centro", active: layout == .listOnly)
+            Picker("Vista de la lista", selection: Binding(
+                get: { [.wide, .stacked, .listOnly].contains(layout) ? layout : .wide },
+                set: { value in
+                    switch value {
+                    case .stacked: run(.stacked)
+                    case .listOnly: run(.listOnly)
+                    default: run(.wide)
+                    }
+                })) {
+                Label("Lista a la izquierda", line: "rectangle.split.2x1").tag(WorkspaceLayout.wide)
+                Label("Lista arriba", line: "rectangle.split.1x2").tag(WorkspaceLayout.stacked)
+                Label("Lista en el centro", line: "list.bullet.rectangle").tag(WorkspaceLayout.listOnly)
             }
-            .padding(2)
-            .background(palette.selection.opacity(0.35), in: .rect(cornerRadius: DesignTokens.popoverRadius))
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Vista de la lista de documentos")
+            .pickerStyle(.segmented).labelStyle(.iconOnly)
+            .help("Vista de la lista: izquierda, arriba o centro")
         }
-        ToolbarItem(id: "newText", placement: .primaryAction) {
-            chrome(.newText, symbol: "square.and.pencil")
-        }
-        ToolbarItem(id: "newTab", placement: .primaryAction) {
-            chrome(.newTab, symbol: "rectangle.on.rectangle.badge.plus")
-        }
+        ToolbarItem(id: "newText", placement: .primaryAction) { toolbarButton(.newText, symbol: "square.and.pencil") }
+        ToolbarItem(id: "newTab", placement: .primaryAction) { toolbarButton(.newTab, symbol: "rectangle.on.rectangle.badge.plus") }
         ToolbarItem(id: "workspaces", placement: .primaryAction) {
-            workspaceMenu
+            Menu { workspaceMenuItems } label: { Label("Espacios de trabajo", line: "rectangle.on.rectangle") }
+                .help("Espacios de trabajo")
         }
         ToolbarItem(id: "search", placement: .primaryAction) {
             searchField.frame(minWidth: 180, idealWidth: 300, maxWidth: 420)
         }
         ToolbarItem(id: "inspector", placement: .primaryAction) {
-            chrome(.inspector, symbol: "sidebar.right", label: inspectorVisible && layout != .focus ? "Ocultar inspector" : "Mostrar inspector",
-                   active: inspectorVisible && layout != .focus)
+            toolbarToggle(.inspector, symbol: "sidebar.right", title: "Inspector")
         }
         ToolbarItem(id: "settings", placement: .primaryAction) {
-            SettingsLink { ChromeSymbol(name: "gearshape") }
-                .buttonStyle(ChromeButtonStyle()).accessibilityLabel("Ajustes").help("Ajustes")
+            SettingsLink { Label("Ajustes", line: "gearshape") }.help("Ajustes")
         }
+    }
+
+    private func toolbarButton(_ command: LibraryCommand, symbol: String) -> some View {
+        Button { run(command) } label: { Label(command.title, line: symbol) }
+            .help(command.title)
+            .disabled(!allows(command))
+    }
+
+    /// Panel switches, as plain toolbar buttons like DEVONthink's. (A native toggle drew its
+    /// "on" highlight behind the neighbouring item in the grouped toolbar.)
+    private func toolbarToggle(_ command: LibraryCommand, symbol: String, title: String) -> some View {
+        Button { run(command) } label: { Label(title, line: symbol) }
+            .help(isSelected(command) ? "Ocultar \(title.lowercased())" : "Mostrar \(title.lowercased())")
+            .accessibilityValue(isSelected(command) ? "Visible" : "Oculto")
+            .disabled(!allows(command))
     }
 
     private var searchField: some View {
@@ -749,9 +762,9 @@ struct LibraryView: View {
             }
         }
         .font(settings.font(-1))
-        .padding(.horizontal, 8).frame(height: 26)
-        .background(palette.background, in: .rect(cornerRadius: DesignTokens.rowRadius))
-        .overlay { RoundedRectangle(cornerRadius: DesignTokens.rowRadius).strokeBorder(palette.border) }
+        .padding(.horizontal, 10).frame(height: 28)
+        .background(palette.background, in: .rect(cornerRadius: 14))
+        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(palette.border) }
     }
 
     /// Path bar of the central column (list and document): history, location and counts.

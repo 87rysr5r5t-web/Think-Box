@@ -18,11 +18,10 @@ enum AppInfo {
     /// The app icon from the bundle (CFBundleIconFile); the generic app icon when run unbundled.
     @MainActor static var icon: NSImage { NSApp.applicationIconImage ?? NSImage() }
 
-    /// The dark glyph of the app icon, cropped to its bounds and turned into a template image,
-    /// so the small toolbar button shows the mark without the icon's white tile and takes the
-    /// text colour like the other toolbar icons.
-    @MainActor static let mark: NSImage? = {
-        // Sample the bundle icon at high resolution; the generic app icon has no usable glyph.
+    /// The app icon cropped to its tile: the transparent margin macOS icons carry is removed so
+    /// the tile fills the toolbar button instead of floating in empty space. Read from the
+    /// bundle's .icns at a fixed 512 px so the result never depends on what macOS caches.
+    @MainActor static let badge: NSImage? = {
         let source: NSImage = Bundle.main.url(forResource: "AppIcon", withExtension: "icns")
             .flatMap(NSImage.init(contentsOf:)) ?? icon
         let side = 512
@@ -34,41 +33,18 @@ enum AppInfo {
               let pixels = context.data?.bindMemory(to: UInt8.self, capacity: side * side * 4) else { return nil }
         context.interpolationQuality = .high
         context.draw(cgSource, in: CGRect(x: 0, y: 0, width: side, height: side))
-        // Keep only the dark glyph, with soft (anti-aliased) edges from its luminance.
+        // Bounds of the opaque tile (ignoring the faint drop shadow).
         var minX = side, minY = side, maxX = -1, maxY = -1
-        var sumX = 0.0, sumY = 0.0, mass = 0.0
         for y in 0..<side {
-            for x in 0..<side {
-                let index = (y * side + x) * 4
-                let alpha = Double(pixels[index + 3]) / 255
-                // Premultiplied: recover colour before judging how dark it is.
-                let luminance = alpha > 0 ? (Double(pixels[index]) + Double(pixels[index + 1]) + Double(pixels[index + 2])) / (3 * alpha) : 255
-                let ink = max(0, min(1, (200 - luminance) / 150)) * alpha
-                pixels[index] = 0; pixels[index + 1] = 0; pixels[index + 2] = 0
-                pixels[index + 3] = UInt8((ink * 255).rounded())
-                if ink > 0.5 {
-                    minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
-                    sumX += Double(x); sumY += Double(y); mass += 1
-                }
+            for x in 0..<side where pixels[(y * side + x) * 4 + 3] > 200 {
+                minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
             }
         }
-        guard mass > 0, let masked = context.makeImage() else { return nil }
-        // Centre on the glyph's mass rather than its bounding box, so the main shape — not the
-        // shape plus its satellite dot — sits in the middle of the button like the other icons.
-        let centerX = sumX / mass, centerY = sumY / mass
-        let half = max(centerX - Double(minX), Double(maxX) - centerX, centerY - Double(minY), Double(maxY) - centerY) + 2
-        let extent = Int((half * 2).rounded(.up))
-        guard let canvas = CGContext(data: nil, width: extent, height: extent, bitsPerComponent: 8, bytesPerRow: extent * 4,
-                                     space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
-        // Loop rows are the image's rows top-down; CGContext drawing runs bottom-up.
-        let originX = half - centerX
-        let originY = half - (Double(side) - centerY)
-        canvas.draw(masked, in: CGRect(x: originX, y: originY, width: Double(side), height: Double(side)))
-        guard let glyph = canvas.makeImage() else { return nil }
-        let image = NSImage(cgImage: glyph, size: NSSize(width: DesignTokens.icon, height: DesignTokens.icon))
-        image.isTemplate = true
-        return image
+        guard maxX > minX, maxY > minY, let full = context.makeImage() else { return nil }
+        let extent = max(maxX - minX, maxY - minY) + 1
+        let crop = CGRect(x: (minX + maxX + 1 - extent) / 2, y: (minY + maxY + 1 - extent) / 2, width: extent, height: extent)
+        guard let tile = full.cropping(to: crop) else { return nil }
+        return NSImage(cgImage: tile, size: NSSize(width: 18, height: 18))
     }()
 }
 
@@ -76,15 +52,14 @@ enum AppInfo {
 struct AboutButton: View {
     var body: some View {
         Button { AboutPresenter.shared.visible = true } label: {
-            if let mark = AppInfo.mark {
-                Image(nsImage: mark).renderingMode(.template).resizable().interpolation(.high)
-                    .frame(width: DesignTokens.icon, height: DesignTokens.icon)
-            } else {
-                Image(nsImage: AppInfo.icon).resizable().interpolation(.high).frame(width: 18, height: 18)
+            Label {
+                Text("Acerca de \(AppInfo.name)")
+            } icon: {
+                Image(nsImage: AppInfo.badge ?? AppInfo.icon).renderingMode(.original)
+                    .resizable().interpolation(.high).frame(width: 18, height: 18)
             }
         }
-        .buttonStyle(ChromeButtonStyle())
-        .accessibilityLabel("Acerca de \(AppInfo.name)")
+        .labelStyle(.iconOnly)
         .help("Acerca de \(AppInfo.name)")
     }
 }

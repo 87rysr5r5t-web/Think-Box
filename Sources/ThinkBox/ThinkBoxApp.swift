@@ -33,7 +33,7 @@ struct ThinkBoxApp: App {
                 .environment(\.locale, Locale(identifier: "es_ES"))
         }
         .defaultSize(width: 1200, height: 760)
-        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
+        .windowToolbarStyle(.unified(showsTitle: false))
         .commands {
             LibraryMenuCommands()
             ToolbarCommands()
