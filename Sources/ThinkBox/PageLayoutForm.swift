@@ -45,7 +45,7 @@ struct PageLayoutForm: View {
             }
             TextField("Empezar a numerar en", value: $layout.firstNumber, format: .number)
             Text("{titulo}   {pagina}   {paginas}   {fecha}   {base}   {grupo}   {autor}")
-                .font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
+                .uiFont(-2).foregroundStyle(.secondary)
         }
     }
 

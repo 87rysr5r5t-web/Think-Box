@@ -53,6 +53,7 @@ struct ThinkBoxApp: App {
 
         Settings {
             SettingsView(settings: settings, store: databases.activeStore)
+                .environment(settings)
                 .themedWindow()
                 .preferredColorScheme(settings.appearance.theme.colorScheme)
                 .environment(\.locale, Locale(identifier: "es_ES"))

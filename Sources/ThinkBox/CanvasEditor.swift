@@ -64,7 +64,7 @@ struct CanvasEditor: View {
         .sheet(item: $openedFile) { file in
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text(file.url.lastPathComponent).font(.headline)
+                    Text(file.url.lastPathComponent).uiFont(0, bold: true)
                     if let subpath = file.subpath, !subpath.isEmpty { Text(subpath).foregroundStyle(.secondary) }
                     Spacer()
                     Button("Cerrar") { openedFile = nil }.keyboardShortcut(.cancelAction)
@@ -85,19 +85,19 @@ struct CanvasEditor: View {
                 Button("Archivo", line: "doc") { addNode("file", size: size) }
                 Button("Enlace web", line: "link") { addNode("link", size: size) }
                 Button("Grupo", line: "rectangle.dashed") { addNode("group", size: size) }
-            }.menuStyle(.borderlessButton).fixedSize().disabled(!editable)
+            }.menuStyle(.button).buttonStyle(ChromeButtonStyle()).fixedSize().disabled(!editable)
             if let fromID = connectingFrom, let from = board?.nodes.first(where: { $0.id == fromID }) {
                 Menu("Conectar con…", systemImage: "arrow.turn.down.right") {
                     ForEach((board?.nodes ?? []).filter { $0.id != fromID }) { node in
                         Button(nodeTitle(node)) { connect(from: from.id, to: node.id) }
                     }
                     Button("Cancelar") { connectingFrom = nil }
-                }.menuStyle(.borderlessButton).fixedSize()
+                }.menuStyle(.button).buttonStyle(ChromeButtonStyle()).fixedSize()
             }
             Spacer(minLength: 2)
             Button("Alejar canvas", line: "minus.magnifyingglass") { scale(zoom / 1.22, around: center(size)) }
                 .labelStyle(.iconOnly).buttonStyle(ChromeButtonStyle())
-            Text("\(Int(zoom * 100)) %").font(.caption).monospacedDigit().foregroundStyle(.secondary)
+            Text("\(Int(zoom * 100)) %").uiFont(-2).monospacedDigit().foregroundStyle(.secondary)
             Button("Acercar canvas", line: "plus.magnifyingglass") { scale(zoom * 1.22, around: center(size)) }
                 .labelStyle(.iconOnly).buttonStyle(ChromeButtonStyle())
             Button("Encuadrar canvas", line: "viewfinder") { fit(size) }.labelStyle(.iconOnly).buttonStyle(ChromeButtonStyle())
@@ -112,7 +112,7 @@ struct CanvasEditor: View {
                         }
                     }
                 }
-            }.labelStyle(.iconOnly).menuStyle(.borderlessButton).fixedSize()
+            }.labelStyle(.iconOnly).chromeMenu()
         }
         .buttonStyle(ChromeButtonStyle())
         .padding(.horizontal, 13).padding(.vertical, 7)
@@ -212,7 +212,7 @@ struct CanvasEditor: View {
         }.onEnded { _ in finishDrag() })
         .overlay(alignment: .bottomTrailing) {
             if editable && selection == node.id {
-                ChromeSymbol(name: "arrow.up.left.and.arrow.down.right").font(.caption2)
+                ChromeSymbol(name: "arrow.up.left.and.arrow.down.right").uiFont(-3)
                     .frame(width: 21, height: 21).background(.regularMaterial, in: .rect(topLeadingRadius: 5))
                     .accessibilityLabel("Redimensionar nodo")
                     .gesture(DragGesture(minimumDistance: 1).onChanged { value in

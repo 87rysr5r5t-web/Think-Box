@@ -160,7 +160,7 @@ struct LibraryView: View {
         }
         .sheet(isPresented: $showWorkspaces) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Espacios de trabajo").font(.title2)
+                Text("Espacios de trabajo").uiFont(4, bold: true)
                 List(savedWorkspaces) { workspace in
                     HStack {
                         Text(workspace.name)
@@ -218,7 +218,7 @@ struct LibraryView: View {
                 }
             }
         } label: { Label("Espacios de trabajo", line: "rectangle.on.rectangle") }
-            .menuStyle(.borderlessButton).menuIndicator(.hidden).labelStyle(.iconOnly).fixedSize()
+            .labelStyle(.iconOnly).chromeMenu()
             .help("Espacios de trabajo")
     }
 
@@ -308,12 +308,11 @@ struct LibraryView: View {
                 } label: {
                     ChromeSymbol(name: "ellipsis")
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
+                .chromeMenu(compact: true)
                 .accessibilityLabel("Acciones de biblioteca")
             }
-            .padding(.horizontal, 12)
+            // Trailing inset matches the section headers so «···» and «+» share one column.
+            .padding(.leading, 12).padding(.trailing, 20)
             .padding(.vertical, 5)
 
             ScrollView {
@@ -322,8 +321,8 @@ struct LibraryView: View {
                         Menu {
                             Button(LibraryCommand.newDatabase.title) { run(.newDatabase) }
                             Button(LibraryCommand.openDatabase.title) { run(.openDatabase) }
-                        } label: { ChromeSymbol(name: "plus") }
-                            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                        } label: { ChromeSymbol(name: "plus", size: 14) }
+                            .chromeMenu(compact: true)
                             .accessibilityLabel("Añadir base de datos")
                     }
                     ForEach(databases.entries) { entry in
@@ -336,9 +335,9 @@ struct LibraryView: View {
                     scopeButton("Borradores", icon: "pencil", destination: .drafts)
                     scopeButton("Papelera", icon: "trash", destination: .trash)
                     sectionHeader("Grupos") {
-                        Button(LibraryCommand.newProject.title, line: "plus") { run(.newProject) }
-                            .labelStyle(.iconOnly)
-                            .buttonStyle(.plain)
+                        Button { run(.newProject) } label: { ChromeSymbol(name: "plus", size: 14) }
+                            .buttonStyle(ChromeButtonStyle(compact: true))
+                            .accessibilityLabel(LibraryCommand.newProject.title)
                             .help("Nuevo grupo")
                     }
                     ForEach(store.library.projects) { project in
@@ -382,8 +381,9 @@ struct LibraryView: View {
     private var tagsSection: some View {
         Group {
             sectionHeader("Etiquetas") {
-                Button(LibraryCommand.newTag.title, line: "plus") { run(.newTag) }
-                    .labelStyle(.iconOnly).buttonStyle(ChromeButtonStyle()).buttonStyle(.plain).help("Nueva etiqueta")
+                Button { run(.newTag) } label: { ChromeSymbol(name: "plus", size: 14) }
+                    .buttonStyle(ChromeButtonStyle(compact: true))
+                    .accessibilityLabel(LibraryCommand.newTag.title).help("Nueva etiqueta")
             }
             SwipeTree(nodes: store.library.tagTree, children: { $0.children }) { branch in
                 scopeButton(branch.name, icon: "tag", destination: .tag(branch.id))
@@ -705,7 +705,7 @@ struct LibraryView: View {
                 chrome(.listOnly, symbol: "list.bullet.rectangle", label: "Lista en el centro", active: layout == .listOnly)
             }
             .padding(2)
-            .overlay { RoundedRectangle(cornerRadius: DesignTokens.rowRadius).strokeBorder(palette.border) }
+            .background(palette.selection.opacity(0.35), in: .rect(cornerRadius: DesignTokens.popoverRadius))
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Vista de la lista de documentos")
         }
@@ -794,7 +794,7 @@ struct LibraryView: View {
             Button(LibraryCommand.newDatabase.title) { run(.newDatabase) }
             Button(LibraryCommand.openDatabase.title) { run(.openDatabase) }
         } label: { Label(database.name, line: "cylinder").lineLimit(1) }
-            .menuStyle(.borderlessButton).fixedSize()
+            .menuStyle(.button).buttonStyle(ChromeButtonStyle()).fixedSize()
             .accessibilityLabel("Base de datos activa: \(database.name)")
     }
 
@@ -1202,9 +1202,9 @@ private struct CreationForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(dialog.title).font(.title2.weight(.semibold))
+            Text(dialog.title).uiFont(4, bold: true)
             if case .savedSearch(let query) = dialog {
-                Text(query).font(.callout).foregroundStyle(.secondary)
+                Text(query).uiFont(-1).foregroundStyle(.secondary)
             }
             TextField("Nombre", text: $name).focused($nameFocused)
             HStack {

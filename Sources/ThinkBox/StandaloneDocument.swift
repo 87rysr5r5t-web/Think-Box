@@ -46,8 +46,8 @@ struct StandaloneDocument: View {
                                     resize: { inspectorWidth = min(380, max(200, -$0)) }) { inspectorVisible.toggle() }
                                 ScrollView {
                                     VStack(alignment: .leading, spacing: 12) {
-                                        Text("Inspector").font(.headline)
-                                        Text(document.displayTitle).font(.title3)
+                                        Text("Inspector").uiFont(0, bold: true)
+                                        Text(document.displayTitle).uiFont(2)
                                         Text(document.modifiedAt.formatted()).foregroundStyle(.secondary)
                                         TagEditor(tags: document.tags, suggestions: store.library.availableTags,
                                             change: { tags in store.update(document.id) { $0.tags = tags } })

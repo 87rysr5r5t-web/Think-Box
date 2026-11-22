@@ -5,9 +5,10 @@ enum DesignTokens {
     static let divider: CGFloat = 1
     static let rowRadius: CGFloat = 6
     static let popoverRadius: CGFloat = 8
-    static let buttonRadius: CGFloat = 4
+    static let buttonRadius: CGFloat = 6
     static let icon: CGFloat = 16
-    static let buttonHitSize: CGFloat = 27
+    static let buttonHitSize: CGFloat = 28
+    static let compactHitSize: CGFloat = 22
     static let windowInset: CGFloat = 28
     static let headerHeight: CGFloat = 64
     static let writingPanelHeaderHeight: CGFloat = 30
@@ -122,15 +123,18 @@ struct ChromeSegmented<Value: Hashable>: View {
 /// the pointer, `selection` while pressed or when `active` (a toggled panel, a chosen layout).
 struct ChromeButtonStyle: ButtonStyle {
     var active = false
+    /// Smaller hit area for controls inside panel headers.
+    var compact = false
 
     func makeBody(configuration: Configuration) -> some View {
-        ChromeButtonBody(configuration: configuration, active: active)
+        ChromeButtonBody(configuration: configuration, active: active, compact: compact)
     }
 }
 
 private struct ChromeButtonBody: View {
     let configuration: ButtonStyleConfiguration
     let active: Bool
+    let compact: Bool
     @Environment(\.colorScheme) private var scheme
     @Environment(\.isEnabled) private var enabled
     @State private var hovering = false
@@ -138,13 +142,20 @@ private struct ChromeButtonBody: View {
     var body: some View {
         let palette = WindowPalette(scheme: scheme)
         let lit = enabled && (hovering || active || configuration.isPressed)
+        let side = compact ? DesignTokens.compactHitSize : DesignTokens.buttonHitSize
         configuration.label
-            .padding(.horizontal, 5)
-            .frame(minWidth: DesignTokens.buttonHitSize, minHeight: DesignTokens.buttonHitSize)
+            .padding(.horizontal, compact ? 3 : 5)
+            .frame(minWidth: side, minHeight: side)
             .foregroundStyle(!enabled ? palette.textTertiary.opacity(0.6) : lit ? palette.textPrimary : palette.textSecondary)
             .background(background(palette), in: .rect(cornerRadius: DesignTokens.buttonRadius))
+            .overlay {
+                if active && enabled {
+                    RoundedRectangle(cornerRadius: DesignTokens.buttonRadius).strokeBorder(palette.border)
+                }
+            }
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
     }
 
     private func background(_ palette: WindowPalette) -> Color {
@@ -172,13 +183,36 @@ private struct ChromePushButtonBody: View {
         let palette = WindowPalette(scheme: scheme)
         configuration.label
             .lineLimit(1)
-            .padding(.horizontal, 9)
-            .frame(minHeight: 22)
-            .foregroundStyle(enabled ? palette.textPrimary : palette.textTertiary)
-            .background(configuration.isPressed ? palette.selection : hovering && enabled ? palette.hover : palette.elevated,
+            .padding(.horizontal, 12)
+            .frame(minHeight: 26)
+            .foregroundStyle(enabled ? (hovering ? palette.textPrimary : palette.textSecondary) : palette.textTertiary)
+            .background(configuration.isPressed ? palette.selection : hovering && enabled ? palette.hover : palette.elevated.opacity(0.6),
                         in: .rect(cornerRadius: DesignTokens.buttonRadius))
-            .overlay { RoundedRectangle(cornerRadius: DesignTokens.buttonRadius).strokeBorder(palette.border) }
+            .overlay {
+                RoundedRectangle(cornerRadius: DesignTokens.buttonRadius)
+                    .strokeBorder(hovering && enabled ? palette.textTertiary.opacity(0.45) : palette.border)
+            }
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
     }
+}
+
+extension View {
+    /// Pull-down menus drawn with the same box, hover and alignment as `ChromeButtonStyle`
+    /// buttons, so icon menus line up with the buttons next to them.
+    func chromeMenu(compact: Bool = false) -> some View {
+        menuStyle(.button).buttonStyle(ChromeButtonStyle(compact: compact)).menuIndicator(.hidden).fixedSize()
+    }
+
+    /// The interface font from Ajustes → Apariencia, so every label uses the same family.
+    func uiFont(_ offset: Int = 0, bold: Bool = false) -> some View { modifier(UIFontModifier(offset: offset, bold: bold)) }
+}
+
+private struct UIFontModifier: ViewModifier {
+    let offset: Int
+    let bold: Bool
+    @Environment(AppSettings.self) private var settings
+
+    func body(content: Content) -> some View { content.font(settings.font(offset, bold: bold)) }
 }

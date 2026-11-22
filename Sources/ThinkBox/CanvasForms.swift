@@ -13,7 +13,7 @@ struct CanvasNodeForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Text("Editar nodo").font(.title2.weight(.semibold))
+            Text("Editar nodo").uiFont(4, bold: true)
             switch node.type {
             case "text":
                 TextEditor(text: field("text")).font(.body.monospaced()).frame(height: 150)
@@ -71,7 +71,7 @@ struct CanvasEdgeForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Text("Editar conexión").font(.title2.weight(.semibold))
+            Text("Editar conexión").uiFont(4, bold: true)
             TextField("Rótulo", text: field("label"))
             HStack {
                 side("Lado de origen", key: "fromSide")

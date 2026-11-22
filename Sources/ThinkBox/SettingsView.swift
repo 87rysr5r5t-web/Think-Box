@@ -221,7 +221,7 @@ private struct InstalledFonts: View {
         let manager = NSFontManager.shared
         let families = manager.availableFontFamilies.filter { query.isEmpty || $0.localizedStandardContains(query) }
         VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.headline)
+            Text(title).uiFont(0, bold: true)
             TextField("Buscar familia tipográfica", text: $query)
             List(families, id: \.self, selection: $family) { Text($0).tag($0) }.frame(height: 220)
             if let family, let faces = manager.availableMembers(ofFontFamily: family) {

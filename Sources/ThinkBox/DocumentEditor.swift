@@ -226,7 +226,7 @@ struct DocumentEditor: View {
 
     private var outlinePane: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Esquema").font(.headline)
+            Text("Esquema").uiFont(0, bold: true)
             if let previewView, previewVisible {
                 Toggle("Miniaturas", isOn: $showPageThumbnails)
                 if showPageThumbnails { PDFThumbnails(pdf: previewView).frame(minHeight: 125) }
@@ -266,7 +266,7 @@ struct DocumentEditor: View {
                 Menu {
                     writingModes(mode)
                 } label: { ChromeSymbol(name: "rectangle.split.2x1") }
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                    .chromeMenu()
                     .accessibilityLabel("Vista de escritura")
             } else {
                 writingModes(mode).labelsHidden().fixedSize()
@@ -390,7 +390,7 @@ struct DocumentEditor: View {
             Button("Ir a página…") { askForPage(preview: false) }
             if compact { Toggle("Mostrar reglas", isOn: $showPageRulers) }
         } label: { ChromeSymbol(name: "ellipsis") }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .chromeMenu()
         .help("Opciones de página del editor").accessibilityLabel("Opciones de página del editor")
     }
 
@@ -403,7 +403,7 @@ struct DocumentEditor: View {
             Toggle("Mostrar miniaturas", isOn: $showPageThumbnails)
             Button("Ir a página…") { askForPage() }
         } label: { ChromeSymbol(name: "ellipsis") }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .chromeMenu()
         .help("Disposición de la previsualización").accessibilityLabel("Disposición de la previsualización")
     }
 
@@ -642,7 +642,7 @@ struct DocumentEditor: View {
                     Menu("Selección", systemImage: "text.cursor") {
                         Button("Etiquetar fragmento…") { markdownFragment(selectedText, copy: false) }
                         Button("Copiar enlace al fragmento") { markdownFragment(selectedText, copy: true) }
-                    }.menuStyle(.borderlessButton).fixedSize()
+                    }.menuStyle(.button).buttonStyle(ChromeButtonStyle()).fixedSize()
                 }
             } else {
                 Button("Restaurar", line: "arrow.uturn.backward") { setTrashed(false) }
@@ -674,7 +674,7 @@ struct DocumentEditor: View {
             } label: {
                 ChromeSymbol(name: "ellipsis")
             }
-            .menuStyle(.borderlessButton)
+            .menuStyle(.button).buttonStyle(ChromeButtonStyle())
             .menuIndicator(.hidden)
             .fixedSize()
             .accessibilityLabel("Acciones del texto")

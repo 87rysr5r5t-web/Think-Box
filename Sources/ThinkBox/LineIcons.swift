@@ -2,14 +2,14 @@ import AppKit
 import SwiftUI
 
 /// Think Box's own linear icon set: drawn on a 24-unit grid, rendered at 16 pt with a
-/// 1.5 pt stroke, round caps and joins, as monochrome template images so they take the
+/// 1.2 pt stroke, round caps and joins, as monochrome template images so they take the
 /// colour of the surrounding text (secondary at rest, primary on hover or when active).
 /// Original drawings in the style of Lucide/Codicons; no third-party artwork is bundled.
 ///
 /// Icons are looked up by the SF Symbol name the code used before, so call sites keep their
 /// meaning. Names without a drawing fall back to the SF Symbol.
 enum LineIcon {
-    static let stroke: CGFloat = 1.5
+    static let stroke: CGFloat = 1.2
 
     static func has(_ name: String) -> Bool { drawings[name] != nil }
 
@@ -21,7 +21,7 @@ enum LineIcon {
         let path = CGMutablePath()
         draw(Pen(path: path))
         let scale = size / 24
-        let width = size < 12 ? stroke * 0.85 : stroke
+        let width = size < 12 ? 1.0 : stroke
         let image = NSImage(size: NSSize(width: size, height: size), flipped: true) { _ in
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
             context.scaleBy(x: scale, y: scale)

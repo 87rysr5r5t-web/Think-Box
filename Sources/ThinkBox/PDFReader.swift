@@ -83,7 +83,7 @@ struct PDFReader: View {
         }
         .sheet(isPresented: $editingNote) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Nota en la página \(pageNumber)").font(.headline)
+                Text("Nota en la página \(pageNumber)").uiFont(0, bold: true)
                 TextEditor(text: $note).frame(width: 350, height: 110)
                 HStack {
                     Spacer()
@@ -103,13 +103,13 @@ struct PDFReader: View {
                 Button("Miniaturas") { inspector = .thumbnails }
                 Button("Índice") { inspector = .outline }
                 Button("Anotaciones") { inspector = .annotations }
-            }.menuStyle(.borderlessButton).menuIndicator(.hidden).labelStyle(.iconOnly).fixedSize()
+            }.labelStyle(.iconOnly).chromeMenu()
             Button("Página anterior", line: "chevron.up") { goTo(pageNumber - 1) }.disabled(pageNumber <= 1)
             TextField("Página", text: $pageInput).frame(width: 39).onSubmit {
                 goTo(Int(pageInput) ?? pageNumber)
                 updatePage()
             }.accessibilityLabel("Página")
-            Text("/ \(pdfView?.document?.pageCount ?? 0)").font(.caption).foregroundStyle(.secondary)
+            Text("/ \(pdfView?.document?.pageCount ?? 0)").uiFont(-2).foregroundStyle(.secondary)
             Button("Página siguiente", line: "chevron.down") { goTo(pageNumber + 1) }
                 .disabled(pageNumber >= (pdfView?.document?.pageCount ?? 0))
             Divider().frame(height: 16)
@@ -126,7 +126,7 @@ struct PDFReader: View {
                 Button("Girar página a la izquierda") { rotate(-90) }
                 Button("Girar página a la derecha") { rotate(90) }
                 Button("Guardar anotaciones y formulario") { _ = savePDF() }
-            }.menuStyle(.borderlessButton).menuIndicator(.hidden).labelStyle(.iconOnly).fixedSize()
+            }.labelStyle(.iconOnly).chromeMenu()
                 .disabled(item.trashedAt != nil || pdfView?.document?.isEncrypted == true)
             Menu("Selección y enlaces", line: "link") {
                 Button("Copiar enlace a esta página") { pageAction(copy: true, selection: false) }
@@ -134,7 +134,7 @@ struct PDFReader: View {
                 Divider()
                 Button("Copiar enlace a la selección") { pageAction(copy: true, selection: true) }.disabled(!selectionAvailable)
                 Button("Etiquetar selección…") { pageAction(copy: false, selection: true) }.disabled(!selectionAvailable)
-            }.menuStyle(.borderlessButton).menuIndicator(.hidden).labelStyle(.iconOnly).fixedSize().disabled(item.trashedAt != nil)
+            }.labelStyle(.iconOnly).chromeMenu().disabled(item.trashedAt != nil)
             Menu("Más herramientas PDF", line: "ellipsis") {
                 Button("Página individual") { setDisplay(.singlePage) }
                 Button("Desplazamiento continuo") { setDisplay(.singlePageContinuous) }
@@ -143,7 +143,7 @@ struct PDFReader: View {
                 Button("Exportar página actual…", action: exportPage)
                 Button("Reconocer texto para la biblioteca (OCR)", action: recognize).disabled(recognitionRunning || item.trashedAt != nil)
                 Button("Imprimir…") { _ = pdfView?.document?.printOperation(for: NSPrintInfo.shared, scalingMode: .pageScaleToFit, autoRotate: true)?.run() }
-            }.menuStyle(.borderlessButton).menuIndicator(.hidden).labelStyle(.iconOnly).fixedSize()
+            }.labelStyle(.iconOnly).chromeMenu()
         }
         .labelStyle(.iconOnly).buttonStyle(ChromeButtonStyle())
         .padding(.horizontal, 12).padding(.vertical, 6)
@@ -155,14 +155,14 @@ struct PDFReader: View {
             TextField("Buscar en el PDF", text: $find).onSubmit(search)
             Button("Buscar", action: search)
             if !matches.isEmpty {
-                Text("\(matchIndex + 1) de \(matches.count)").monospacedDigit().font(.caption)
+                Text("\(matchIndex + 1) de \(matches.count)").monospacedDigit().uiFont(-2)
                 Button("Coincidencia anterior", line: "chevron.up") { showMatch(matchIndex - 1) }.labelStyle(.iconOnly)
                     .buttonStyle(ChromeButtonStyle())
                 Button("Coincidencia siguiente", line: "chevron.down") { showMatch(matchIndex + 1) }.labelStyle(.iconOnly)
                     .buttonStyle(ChromeButtonStyle())
             }
             if recognitionRunning { ProgressView().controlSize(.small) }
-            if let recognitionMessage { Text(recognitionMessage).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+            if let recognitionMessage { Text(recognitionMessage).uiFont(-2).foregroundStyle(.secondary).lineLimit(1) }
         }.padding(.horizontal, 12).padding(.vertical, 6)
             .onChange(of: find) { matches = []; pdfView?.highlightedSelections = nil }
     }
@@ -193,7 +193,7 @@ struct PDFReader: View {
                     } label: {
                         VStack(alignment: .leading) {
                             Text(entry.annotation.contents ?? entry.annotation.type ?? "Marca").lineLimit(2)
-                            Text("Página \(entry.page + 1)").font(.caption).foregroundStyle(.secondary)
+                            Text("Página \(entry.page + 1)").uiFont(-2).foregroundStyle(.secondary)
                         }
                     }.buttonStyle(.plain)
                         .contextMenu {
