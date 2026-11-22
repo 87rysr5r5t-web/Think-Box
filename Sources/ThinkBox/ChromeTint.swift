@@ -49,6 +49,33 @@ struct TintedSurface: View {
     }
 }
 
+extension TintedSurface {
+    /// The same surface as a repeating tile, for places that take a single paint (the full
+    /// screen toolbar): palette surface, colour and grain baked into one image.
+    @MainActor static func paint(_ tint: ChromeTintOptions, dark: Bool) -> ImagePaint {
+        let side: CGFloat = 128
+        let surface = dark ? NSColor(srgbRed: 0x14 / 255, green: 0x14 / 255, blue: 0x15 / 255, alpha: 1)
+            : NSColor(srgbRed: 0xED / 255, green: 0xED / 255, blue: 0xEB / 255, alpha: 1)
+        let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            guard let context = NSGraphicsContext.current?.cgContext else { return false }
+            context.setFillColor(surface.cgColor)
+            context.fill(rect)
+            if tint.enabled {
+                let color = NSColor(Color(hue: tint.hue, saturation: tint.saturation, brightness: dark ? 0.55 : 0.92))
+                context.setFillColor(color.withAlphaComponent(tint.intensity * (dark ? 0.45 : 0.6)).cgColor)
+                context.fill(rect)
+                if tint.noise > 0, let grain = Grain.image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                    context.setBlendMode(dark ? .plusLighter : .multiply)
+                    context.setAlpha(tint.noise * (dark ? 0.22 : 0.3))
+                    context.draw(grain, in: rect)
+                }
+            }
+            return true
+        }
+        return ImagePaint(image: Image(nsImage: image), scale: 0.5)
+    }
+}
+
 /// A fixed tile of monochrome noise, generated once.
 private enum Grain {
     @MainActor static let image: NSImage = {

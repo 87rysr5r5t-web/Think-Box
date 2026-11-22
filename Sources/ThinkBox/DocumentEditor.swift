@@ -28,6 +28,7 @@ struct DocumentEditor: View {
     @FocusState private var titleFocused: Bool
     @SceneStorage("document.outlineVisible") private var outlineVisible = false
     @ViewState private var outlinePreview: CGFloat?
+    @AppStorage("editor.outlineWidth") private var outlineWidth = 180.0
     @ViewState private var showingDetails = false
     @ViewState private var showingLinks = false
     @ViewState private var selectedText = NSRange(location: 0, length: 0)
@@ -182,9 +183,11 @@ struct DocumentEditor: View {
                 HStack(spacing: 0) {
                     if docked && (outlineVisible || outlinePreview != nil) {
                         outlinePane
-                            .frame(width: 180)
-                            .frame(width: outlinePreview ?? 180, alignment: .trailing).clipped()
-                        WorkspaceDivider(color: palette.border, extent: 180, resize: { _ in }) { outlineVisible.toggle() }
+                            .frame(width: outlineWidth)
+                            .frame(width: outlinePreview ?? outlineWidth, alignment: .trailing).clipped()
+                        WorkspaceDivider(color: palette.border, extent: outlineWidth, resize: {
+                            outlineWidth = min(360, max(150, $0))
+                        }) { outlineVisible.toggle() }
                     }
                     GeometryReader { geometry in
                         let dividerWidth = split ? DesignTokens.divider : 0
@@ -212,12 +215,12 @@ struct DocumentEditor: View {
         .background(settings.editor.customColors ? settings.editor.paper.color : palette.workspace)
         .background {
             PaneScrollMonitor(options: settings.gestures, target: { point, direction in
-                guard point.x < (outlineVisible ? 186 : CGFloat(settings.gestures.edge)),
+                guard point.x < (outlineVisible ? outlineWidth + 6 : CGFloat(settings.gestures.edge)),
                       outlineVisible ? direction == .left : direction == .right else { return nil }
-                return PaneSwipeTarget(pane: .navigation, isOpen: outlineVisible, extent: 180)
+                return PaneSwipeTarget(pane: .navigation, isOpen: outlineVisible, extent: outlineWidth)
             }, update: { target, distance in
                 guard !reduceMotion else { return }
-                outlinePreview = max(0, min(196, target.isOpen ? 180 - distance : distance))
+                outlinePreview = max(0, min(outlineWidth + 16, target.isOpen ? outlineWidth - distance : distance))
             }, finish: { _, toggle in
                 withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
                     outlinePreview = nil
@@ -263,6 +266,8 @@ struct DocumentEditor: View {
 
     private func writingHeader(width: CGFloat, docked: Bool) -> some View {
         let mode = Binding<WritingViewMode>(get: { pageViews.mode }, set: { mode in
+            // Split view always starts with the preview at the editor's scale.
+            if mode == .split { previewZoom = 1 }
             changeViews { $0.mode = mode }
         })
         return HStack {
@@ -271,6 +276,8 @@ struct DocumentEditor: View {
                 .focused($titleFocused).accessibilityLabel("Título del texto")
                 .disabled(document.trashedAt != nil)
             writingModes(mode)
+            Rectangle().fill(palette.border).frame(width: DesignTokens.divider, height: 16).padding(.horizontal, 4)
+                .accessibilityHidden(true)
             Button { outlineVisible.toggle() } label: { ChromeSymbol(name: "list.bullet.indent") }
                 .buttonStyle(ChromeButtonStyle()).help("Mostrar u ocultar esquema").accessibilityLabel("Mostrar u ocultar esquema")
                 .popover(isPresented: Binding(get: { !docked && outlineVisible },
@@ -332,6 +339,7 @@ struct DocumentEditor: View {
                             richTextData: document.richTextData, onRichEdit: { data, text in
                                 store.update(document.id, deferWrite: true) { $0.richTextData = data; $0.markdown = text }
                             }, plain: document.plainText == true, showsRulers: showPageRulers,
+                            allowsZoom: pageViews.mode == .source,
                             onMargins: { layout in store.update(document.id, touch: false) { $0.pageLayout = layout } },
                             onRulerHeight: { sourceRulerHeight = $0 },
                             onViewport: sourceMoved,
@@ -390,6 +398,8 @@ struct DocumentEditor: View {
                             Divider()
                         }
                         PaginatedPreview(pages: rendered.pages, display: pageDisplay, zoom: previewZoom,
+                                         allowsPinch: pageViews.mode == .preview,
+                                         onZoom: { previewZoom = (($0 * 100).rounded()) / 100 },
                                          destination: previewTarget, onPage: previewMoved,
                                          onView: { previewView = $0 })
                     }.frame(maxWidth: .infinity, maxHeight: .infinity)

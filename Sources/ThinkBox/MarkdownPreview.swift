@@ -35,6 +35,10 @@ struct PaginatedPreview: NSViewRepresentable {
     /// Scale relative to the editor's sheet (the panel width minus the border); set only by the
     /// zoom buttons in the preview header, never by pinching.
     var zoom: CGFloat = 1
+    /// Pinch zoom allowed (the preview shown alone); the new zoom is reported back so the
+    /// header buttons continue from it.
+    var allowsPinch = false
+    var onZoom: ((CGFloat) -> Void)? = nil
     let destination: PageDestination?
     let onPage: (Int) -> Void
     let onView: (PDFView) -> Void
@@ -101,10 +105,25 @@ struct PaginatedPreview: NSViewRepresentable {
             coordinator.fitWidth(self)
         }
 
-        /// No pinch zoom: the preview is zoomed with its header buttons only, so a two-finger
-        /// gesture over it is free to fold the side panels.
-        override func magnify(with event: NSEvent) {}
-        override func smartMagnify(with event: NSEvent) {}
+        /// Pinch zooms only when the preview is shown alone; in split view the header buttons
+        /// are the only zoom, so the sheet keeps the editor's scale.
+        override func magnify(with event: NSEvent) {
+            guard let coordinator, coordinator.parent.allowsPinch else { return }
+            setZoom(min(4, max(0.5, coordinator.zoom * (1 + event.magnification))))
+        }
+
+        override func smartMagnify(with event: NSEvent) {
+            guard let coordinator, coordinator.parent.allowsPinch else { return }
+            setZoom(abs(coordinator.zoom - 1) < 0.01 ? 1.5 : 1)
+        }
+
+        private func setZoom(_ value: CGFloat) {
+            guard let coordinator else { return }
+            coordinator.zoom = value
+            coordinator.fitWidth(self)
+            let report = coordinator.parent.onZoom
+            Task { @MainActor in report?(value) }
+        }
     }
 
     @MainActor final class Coordinator: NSObject {

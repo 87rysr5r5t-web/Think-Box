@@ -165,6 +165,8 @@ enum LineIcon {
             pen.pill(center: CGPoint(x: 15.2, y: 8.8), length: 11, thickness: 6, angle: -.pi / 4)
         },
         "doc": document,
+        // A text document: the page with lines of text, used for Markdown and plain text items.
+        "doc.text": { document($0); $0.line(8, 12, 16, 12); $0.line(8, 15.5, 16, 15.5); $0.line(8, 19, 13, 19) },
         "doc.fill": { document($0); $0.line(8, 13, 16, 13); $0.line(8, 17, 14, 17) },
         "doc.on.doc": { $0.rect(8, 8, 14, 14); $0.rounded(4, 16, 2, 16, 2, 2, 16, 2, 16, 4) },
         "quote.opening": { pen in
