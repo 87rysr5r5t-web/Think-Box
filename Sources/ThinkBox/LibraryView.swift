@@ -87,6 +87,9 @@ struct LibraryView: View {
             } else {
                 let results = store.library.results(in: scope, matching: query)
                 VStack(spacing: 0) {
+                    // Hairline under the toolbar: the sidebar shares its colour, so without it the
+                    // sidebar would seem to run up behind the toolbar buttons.
+                    rule
                     if tabs.count > 1 { tabBar; rule }
                     GeometryReader { paneWorkspace(size: $0.size, results: results) }
                     rule
@@ -95,7 +98,10 @@ struct LibraryView: View {
             }
         }
         .themedWindow()
-        .background(palette.workspace)
+        .background(palette.workspace, ignoresSafeAreaEdges: [])
+        // Only the toolbar strip above the safe area takes the surface colour (tinted, if a window
+        // colour is set), so no pane (sidebar, tab strip, inspector) bleeds up behind the toolbar.
+        .background { TintedSurface().ignoresSafeArea() }
         .background { MainWindowTracker() }
         .overlay { AboutOverlay() }
         .toolbar(id: "library") { libraryToolbar }
@@ -117,6 +123,8 @@ struct LibraryView: View {
                 switch item {
                 case .project:
                     if let id = store.createProject(name) { setScope(.project(id)) }
+                case .subgroup(let parent):
+                    if let id = store.createProject(name, parent: parent) { setScope(.project(id)) }
                 case .savedSearch(let search):
                     if let id = store.createSavedSearch(name: name, query: search) { setScope(.savedSearch(id)) }
                 case .tag, .renameTagSeed:
@@ -328,7 +336,6 @@ struct LibraryView: View {
                         }.help(entry.fileURL.path)
                     }
                     scopeButton("Entrada", icon: "tray", destination: .inbox)
-                    scopeButton("Borradores", icon: "pencil", destination: .drafts)
                     scopeButton("Papelera", icon: "trash", destination: .trash)
                     sectionHeader("Grupos") {
                         Button { run(.newProject) } label: { ChromeSymbol(name: "plus", size: 14) }
@@ -336,10 +343,10 @@ struct LibraryView: View {
                             .accessibilityLabel(LibraryCommand.newProject.title)
                             .help("Nuevo grupo")
                     }
-                    ForEach(store.library.projects) { project in
-                        scopeButton(project.name, icon: "folder", destination: .project(project.id))
-                            .contextMenu { Button("Etiquetas del grupo…") { projectForTags = project.id } }
+                    SwipeTree(nodes: store.library.groupTree, children: { $0.children }) { branch in
+                        groupRow(branch.project)
                     }
+
                     tagsSection
                     if !store.library.savedSearches.isEmpty {
                         sectionHeader("Búsquedas guardadas") { EmptyView() }
@@ -353,11 +360,11 @@ struct LibraryView: View {
             }
             sidebarFooter
         }
-        .background(palette.sidebar)
+        .background { TintedSurface() }
     }
 
     private func resultsPane(_ results: [LibraryResult]) -> some View {
-        documentList(results).background(palette.workspace)
+        documentList(results).background(palette.workspace, ignoresSafeAreaEdges: [])
     }
 
     private var sidebarFooter: some View {
@@ -372,6 +379,36 @@ struct LibraryView: View {
         }
         .padding(.horizontal, 12).padding(.vertical, 5)
         .overlay(alignment: .top) { Rectangle().fill(palette.border).frame(height: 1) }
+    }
+
+    private func groupRow(_ project: Project) -> some View {
+        scopeButton(project.name, icon: "folder", destination: .project(project.id))
+            .draggable("thinkbox-group:" + project.id.uuidString)
+            .dropDestination(for: String.self) { values, _ in nestGroups(values, into: project.id) }
+            .contextMenu {
+                Button("Nuevo subgrupo…") { dialog = .subgroup(project.id) }
+                Button("Etiquetas del grupo…") { projectForTags = project.id }
+                if project.parentID != nil {
+                    Divider()
+                    Button("Mover al nivel superior") {
+                        _ = store.commit { $0.moveGroup(project.id, into: nil) }
+                    }
+                }
+            }
+    }
+
+    /// Dropping a group on another nests it there; moves into its own descendants are refused.
+    private func nestGroups(_ values: [String], into parent: UUID) -> Bool {
+        let ids = values.compactMap { value -> UUID? in
+            guard value.hasPrefix("thinkbox-group:") else { return nil }
+            return UUID(uuidString: String(value.dropFirst("thinkbox-group:".count)))
+        }
+        guard !ids.isEmpty else { return false }
+        var moved = false
+        store.commit { library in
+            for id in ids where library.moveGroup(id, into: parent) { moved = true }
+        }
+        return moved
     }
 
     private var tagsSection: some View {
@@ -458,60 +495,137 @@ struct LibraryView: View {
                     .padding(.horizontal, 19)
                     .padding(.top, 12)
             } else {
-                List(documents, selection: resultSelection) { hit in
-                    let target = store.destination(hit.document.id, fragmentID: hit.fragment?.id)
-                    VStack(alignment: .leading, spacing: 4) {
-                        if let fragment = hit.fragment {
-                            HStack(alignment: .top, spacing: 5) {
-                                ChromeSymbol(name: "quote.opening", size: 11).padding(.top, 2)
-                                Text(fragment.quote).lineLimit(2)
-                            }.font(settings.font(list: true))
-                            Text(listTitle(hit.document)).font(settings.font(-2, list: true)).foregroundStyle(.secondary).lineLimit(1)
-                        } else {
-                            Text(listTitle(hit.document)).font(settings.font(list: true)).lineLimit(1)
-                            if settings.list.showDetails || settings.list.showDates {
-                                HStack(spacing: 6) {
-                                    if settings.list.showDetails { Text(hit.document.attachment?.kind.label ?? hit.document.stage.title) }
-                                    Spacer(minLength: 0)
-                                    if settings.list.showDates { Text(hit.document.modifiedAt, format: .dateTime.day().month(.abbreviated)) }
-                                }.font(settings.font(-2, list: true)).foregroundStyle(.secondary)
+                if listStyle == .icons {
+                    iconGrid(documents)
+                } else {
+                    List(selection: resultSelection) {
+                        ForEach(Array(documents.enumerated()), id: \.element.id) { index, hit in
+                            let target = store.destination(hit.document.id, fragmentID: hit.fragment?.id)
+                            Group {
+                                if listStyle == .compact { compactRow(hit) } else { detailedRow(hit) }
                             }
-                        }
-                        let tags = hit.fragment?.tags ?? store.library.effectiveTags(of: hit.document)
-                        if settings.list.showTags && !tags.isEmpty {
-                            Text(tags.joined(separator: " · ")).font(settings.font(-2, list: true)).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                    }
-                    .padding(.vertical, rowPadding)
-                    .tag(target)
-                    .draggable(target.url.absoluteString)
-                    .contextMenu {
-                        Button(LibraryCommand.copyLink.title) { run(.copyLink, target: target) }
-                        Button(LibraryCommand.exportFile.title) { run(.exportFile, target: target) }
-                        if hit.document.trashedAt == nil {
-                            Button("Abrir en pestaña nueva") { openTab(at: target) }
-                            Button(LibraryCommand.openWindow.title) { run(.openWindow, target: target) }
-                        }
-                        Button("Abrir en el visor") {
-                            if layout == .listOnly { setLayout(.wide) }
-                            visit(LibraryLocation(scope: scope, selection: target, target: target, query: query))
-                        }
-                        if hit.fragment != nil, hit.document.trashedAt == nil {
-                            Button("Ir al fragmento") { openDocument(target) }
-                            Button("Editar etiquetas del fragmento…") { fragmentToEdit = hit }
-                        }
-                        Divider()
-                        if hit.document.trashedAt == nil {
-                            Button(LibraryCommand.moveToTrash.title, role: .destructive) { run(.moveToTrash, target: target) }
-                        } else {
-                            Button(LibraryCommand.putBack.title) { run(.putBack, target: target) }
+                            .tag(target)
+                            .draggable(target.url.absoluteString)
+                            .contextMenu { documentMenu(hit, target: target) }
+                            // Classic striped rows, edge to edge: one light, one a shade darker.
+                            .listRowBackground(index.isMultiple(of: 2) ? Color.clear : palette.stripe)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10))
                         }
                     }
+                    .id(database.id)
+                    .listStyle(.plain)
+                    .environment(\.defaultMinListRowHeight, listStyle == .compact ? 22 : 30)
+                    .scrollContentBackground(.hidden)
                 }
-                .id(database.id)
-                .listStyle(.sidebar)
-                .scrollContentBackground(.hidden)
             }
+        }
+    }
+
+    private var listStyle: DocumentListStyle { settings.list.style ?? .compact }
+
+    /// One line per item, DEVONthink-style: icon, title and date.
+    private func compactRow(_ hit: LibraryResult) -> some View {
+        HStack(spacing: 6) {
+            ChromeSymbol(name: hit.fragment != nil ? "quote.opening" : documentSymbol(hit.document), size: 12)
+                .foregroundStyle(palette.textSecondary)
+            Text(hit.fragment?.quote ?? listTitle(hit.document)).lineLimit(1)
+            Spacer(minLength: 4)
+            if settings.list.showDates {
+                Text(hit.document.modifiedAt, format: .dateTime.day().month(.abbreviated))
+                    .font(settings.font(-2, list: true)).foregroundStyle(.secondary)
+            }
+        }
+        .font(settings.font(-1, list: true))
+        .padding(.vertical, 1)
+    }
+
+    private func detailedRow(_ hit: LibraryResult) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let fragment = hit.fragment {
+                HStack(alignment: .top, spacing: 5) {
+                    ChromeSymbol(name: "quote.opening", size: 11).padding(.top, 2)
+                    Text(fragment.quote).lineLimit(2)
+                }.font(settings.font(list: true))
+                Text(listTitle(hit.document)).font(settings.font(-2, list: true)).foregroundStyle(.secondary).lineLimit(1)
+            } else {
+                Text(listTitle(hit.document)).font(settings.font(list: true)).lineLimit(1)
+                if settings.list.showDetails || settings.list.showDates {
+                    HStack(spacing: 6) {
+                        if settings.list.showDetails { Text(hit.document.attachment?.kind.label ?? hit.document.stage.title) }
+                        Spacer(minLength: 0)
+                        if settings.list.showDates { Text(hit.document.modifiedAt, format: .dateTime.day().month(.abbreviated)) }
+                    }.font(settings.font(-2, list: true)).foregroundStyle(.secondary)
+                }
+            }
+            let tags = hit.fragment?.tags ?? store.library.effectiveTags(of: hit.document)
+            if settings.list.showTags && !tags.isEmpty {
+                Text(tags.joined(separator: " · ")).font(settings.font(-2, list: true)).foregroundStyle(.secondary).lineLimit(1)
+            }
+        }
+        .padding(.vertical, rowPadding)
+    }
+
+    /// Icon view: a tile per item with its title underneath.
+    private func iconGrid(_ documents: [LibraryResult]) -> some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 96, maximum: 120), spacing: 6)], spacing: 8) {
+                ForEach(documents) { hit in
+                    let target = store.destination(hit.document.id, fragmentID: hit.fragment?.id)
+                    let selected = selection == target
+                    VStack(spacing: 6) {
+                        ChromeSymbol(name: hit.fragment != nil ? "quote.opening" : documentSymbol(hit.document), size: 28)
+                            .foregroundStyle(palette.textSecondary)
+                            .frame(width: 58, height: 58)
+                            .background(palette.elevated, in: .rect(cornerRadius: DesignTokens.rowRadius))
+                            .overlay { RoundedRectangle(cornerRadius: DesignTokens.rowRadius).strokeBorder(palette.border) }
+                        Text(hit.fragment?.quote ?? listTitle(hit.document))
+                            .font(settings.font(-2, list: true)).lineLimit(2).multilineTextAlignment(.center)
+                    }
+                    .padding(6).frame(maxWidth: .infinity)
+                    .background(selected ? palette.selection : .clear, in: .rect(cornerRadius: DesignTokens.rowRadius))
+                    .contentShape(Rectangle())
+                    .onTapGesture { resultSelection.wrappedValue = target }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+                    .draggable(target.url.absoluteString)
+                    .contextMenu { documentMenu(hit, target: target) }
+                }
+            }
+            .padding(10)
+        }
+        .id(database.id)
+    }
+
+    private func documentSymbol(_ document: WritingDocument) -> String {
+        switch document.attachment?.kind {
+        case .pdf: "doc"
+        case .canvas: "rectangle.dashed"
+        case .preview: "doc.on.doc"
+        case nil: "text.alignleft"
+        }
+    }
+
+    @ViewBuilder private func documentMenu(_ hit: LibraryResult, target: ItemDestination) -> some View {
+        Button(LibraryCommand.copyLink.title) { run(.copyLink, target: target) }
+        Button(LibraryCommand.exportFile.title) { run(.exportFile, target: target) }
+        if hit.document.trashedAt == nil {
+            Button("Abrir en pestaña nueva") { openTab(at: target) }
+            Button(LibraryCommand.openWindow.title) { run(.openWindow, target: target) }
+        }
+        Button("Abrir en el visor") {
+            if layout == .listOnly { setLayout(.wide) }
+            visit(LibraryLocation(scope: scope, selection: target, target: target, query: query))
+        }
+        if hit.fragment != nil, hit.document.trashedAt == nil {
+            Button("Ir al fragmento") { openDocument(target) }
+            Button("Editar etiquetas del fragmento…") { fragmentToEdit = hit }
+        }
+        Divider()
+        if hit.document.trashedAt == nil {
+            Button(LibraryCommand.moveToTrash.title, role: .destructive) { run(.moveToTrash, target: target) }
+        } else {
+            Button(LibraryCommand.putBack.title) { run(.putBack, target: target) }
         }
     }
 
@@ -691,46 +805,82 @@ struct LibraryView: View {
     @ToolbarContentBuilder private var libraryToolbar: some CustomizableToolbarContent {
         // Toolbar items use the system's own toolbar rendering (hover, pressed and grouping),
         // so they line up with the window controls; only the icons are Think Box's.
-        ToolbarItem(id: "about", placement: .navigation) { AboutButton() }
+        // `.buttonStyle(.automatic)` undoes the scene-wide `ChromePushButtonStyle` from
+        // `themedWindow()`, which drew a white bezel inside each toolbar capsule.
+        ToolbarItem(id: "about", placement: .navigation) { AboutButton().buttonStyle(.automatic) }
         ToolbarItem(id: "sidebar", placement: .navigation) {
             toolbarToggle(.sidebar, symbol: "sidebar.left", title: "Barra lateral")
         }
-        ToolbarItem(id: "listView", placement: .navigation) {
-            Picker("Vista de la lista", selection: Binding(
-                get: { [.wide, .stacked, .listOnly].contains(layout) ? layout : .wide },
-                set: { value in
-                    switch value {
-                    case .stacked: run(.stacked)
-                    case .listOnly: run(.listOnly)
-                    default: run(.wide)
-                    }
-                })) {
-                Label("Lista a la izquierda", line: "rectangle.split.2x1").tag(WorkspaceLayout.wide)
-                Label("Lista arriba", line: "rectangle.split.1x2").tag(WorkspaceLayout.stacked)
-                Label("Lista en el centro", line: "list.bullet.rectangle").tag(WorkspaceLayout.listOnly)
-            }
-            .pickerStyle(.segmented).labelStyle(.iconOnly)
-            .help("Vista de la lista: izquierda, arriba o centro")
+        layoutToolbarItems
+        creationToolbarItems
+        ToolbarItem(id: "search", placement: .primaryAction) {
+            // Leading inset keeps the magnifier off the left edge of its toolbar capsule.
+            searchField.frame(minWidth: 180, idealWidth: 300, maxWidth: 420).padding(.leading, 8)
         }
-        ToolbarItem(id: "newText", placement: .primaryAction) { toolbarButton(.newText, symbol: "square.and.pencil") }
+        ToolbarItem(id: "inspector", placement: .primaryAction) {
+            toolbarToggle(.inspector, symbol: "sidebar.right", title: "Inspector")
+        }
+        ToolbarItem(id: "tint", placement: .primaryAction) { ChromeTintButton() }
+        ToolbarItem(id: "settings", placement: .primaryAction) {
+            SettingsLink { Label("Ajustes", line: "gearshape") }.buttonStyle(.automatic).help("Ajustes")
+        }
+    }
+
+    @ToolbarContentBuilder private var layoutToolbarItems: some CustomizableToolbarContent {
+        // Three separate buttons, as in DEVONthink, instead of one segmented control (which the
+        // toolbar can collapse into a pull-down menu). The active one carries a soft fill.
+        ToolbarItem(id: "layoutWide", placement: .navigation) { layoutButton(.wide, symbol: "rectangle.split.2x1") }
+        ToolbarItem(id: "layoutStacked", placement: .navigation) { layoutButton(.stacked, symbol: "rectangle.split.1x2") }
+        ToolbarItem(id: "layoutListOnly", placement: .navigation) { layoutButton(.listOnly, symbol: "list.bullet.rectangle") }
+    }
+
+    @ToolbarContentBuilder private var creationToolbarItems: some CustomizableToolbarContent {
+        ToolbarItem(id: "newText", placement: .primaryAction) {
+            // Click creates a Markdown text; the arrow opens every other kind of item.
+            Menu {
+                ForEach([LibraryCommand.newText, .newCanvas, .newProject, .newTag]) { command in
+                    Button(command.title) { run(command) }.disabled(!allows(command))
+                }
+                if case .project(let parent) = scope {
+                    Button("Nuevo subgrupo…") { dialog = .subgroup(parent) }
+                }
+                Divider()
+                Button(LibraryCommand.newDatabase.title) { run(.newDatabase) }.disabled(!allows(.newDatabase))
+                Button(LibraryCommand.openDatabase.title) { run(.openDatabase) }.disabled(!allows(.openDatabase))
+                Divider()
+                Button(LibraryCommand.importFiles.title) { run(.importFiles) }.disabled(!allows(.importFiles))
+            } label: {
+                Label("Nuevo", line: "square.and.pencil")
+            } primaryAction: {
+                run(.newText)
+            }
+            .help("Nuevo texto Markdown; mantén pulsado o usa la flecha para crear otros elementos")
+        }
         ToolbarItem(id: "newTab", placement: .primaryAction) { toolbarButton(.newTab, symbol: "rectangle.on.rectangle.badge.plus") }
         ToolbarItem(id: "workspaces", placement: .primaryAction) {
             Menu { workspaceMenuItems } label: { Label("Espacios de trabajo", line: "rectangle.on.rectangle") }
                 .help("Espacios de trabajo")
         }
-        ToolbarItem(id: "search", placement: .primaryAction) {
-            searchField.frame(minWidth: 180, idealWidth: 300, maxWidth: 420)
-        }
-        ToolbarItem(id: "inspector", placement: .primaryAction) {
-            toolbarToggle(.inspector, symbol: "sidebar.right", title: "Inspector")
-        }
-        ToolbarItem(id: "settings", placement: .primaryAction) {
-            SettingsLink { Label("Ajustes", line: "gearshape") }.help("Ajustes")
-        }
+    }
+
+    private func layoutButton(_ command: LibraryCommand, symbol: String) -> some View {
+        let active = isSelected(command)
+        return Button { run(command) } label: { Label(command.title, line: symbol) }
+            .buttonStyle(.automatic)
+            .background {
+                if active {
+                    RoundedRectangle(cornerRadius: DesignTokens.buttonRadius).fill(palette.selection)
+                        .frame(width: 30, height: 26)
+                }
+            }
+            .accessibilityAddTraits(active ? .isSelected : [])
+            .help(command.title)
+            .disabled(!allows(command))
     }
 
     private func toolbarButton(_ command: LibraryCommand, symbol: String) -> some View {
         Button { run(command) } label: { Label(command.title, line: symbol) }
+            .buttonStyle(.automatic)
             .help(command.title)
             .disabled(!allows(command))
     }
@@ -739,6 +889,7 @@ struct LibraryView: View {
     /// "on" highlight behind the neighbouring item in the grouped toolbar.)
     private func toolbarToggle(_ command: LibraryCommand, symbol: String, title: String) -> some View {
         Button { run(command) } label: { Label(title, line: symbol) }
+            .buttonStyle(.automatic)
             .help(isSelected(command) ? "Ocultar \(title.lowercased())" : "Mostrar \(title.lowercased())")
             .accessibilityValue(isSelected(command) ? "Visible" : "Oculto")
             .disabled(!allows(command))
@@ -762,9 +913,10 @@ struct LibraryView: View {
             }
         }
         .font(settings.font(-1))
-        .padding(.horizontal, 10).frame(height: 28)
-        .background(palette.background, in: .rect(cornerRadius: 14))
-        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(palette.border) }
+        // No fill or border of its own: the toolbar capsule is the field's only background.
+        .padding(.horizontal, 4).frame(height: 28)
+        .contentShape(Rectangle())
+        .onTapGesture { searchFocused = true }
     }
 
     /// Path bar of the central column (list and document): history, location and counts.
@@ -786,10 +938,18 @@ struct LibraryView: View {
             Text((count == 1 ? "1 elemento" : "\(count) elementos") + (selection != nil ? ", 1 seleccionado" : ""))
                 .foregroundStyle(palette.textSecondary).lineLimit(1)
             Spacer(minLength: 4)
+            Menu {
+                Picker("Vista de la lista", selection: Binding(get: { listStyle }, set: { settings.list.style = $0 })) {
+                    ForEach(DocumentListStyle.allCases, id: \.self) { Label($0.title, line: $0.symbol).tag($0) }
+                }.pickerStyle(.inline)
+            } label: { ChromeSymbol(name: listStyle.symbol) }
+                .chromeMenu(compact: true)
+                .help("Vista de la lista: filas con detalles, filas estrechas o iconos")
+                .accessibilityLabel("Vista de la lista")
         }
         .font(settings.font(-1)).padding(.horizontal, 8)
         .frame(height: DesignTokens.pathBarHeight)
-        .background(palette.background)
+        .background(palette.background, ignoresSafeAreaEdges: [])
     }
 
     private var databaseMenu: some View {
@@ -823,7 +983,7 @@ struct LibraryView: View {
                     Rectangle().fill(palette.border).frame(width: DesignTokens.divider)
                 }
             }
-        }.scrollIndicators(.never).frame(height: 30).background(palette.surface)
+        }.scrollIndicators(.never).frame(height: 30).background(palette.surface, ignoresSafeAreaEdges: [])
     }
 
     private var currentDocument: WritingDocument? { selection.flatMap { store.document($0.documentID) } }
@@ -860,7 +1020,7 @@ struct LibraryView: View {
             } else {
                 ContentUnavailableView("Sin selección", line: "sidebar.right")
             }
-        }.frame(maxHeight: .infinity, alignment: .topLeading).background(palette.sidebar)
+        }.frame(maxHeight: .infinity, alignment: .topLeading).background { TintedSurface() }
     }
 
     private func statusBar(count: Int) -> some View {
@@ -895,7 +1055,7 @@ struct LibraryView: View {
                 }
             }
         }
-        .background(palette.workspace)
+        .background(palette.workspace, ignoresSafeAreaEdges: [])
     }
 
     private func allows(_ command: LibraryCommand) -> Bool {
@@ -1004,7 +1164,8 @@ struct LibraryView: View {
         return databases.entries.flatMap { entry -> [QuickAction] in
             guard let source = databases.store(for: entry.id) else { return [] }
             let groups = source.library.projects.map { group in
-                QuickAction(id: "\(entry.id)/group/\(group.id)", title: group.name, detail: "Grupo · \(entry.name)") {
+                QuickAction(id: "\(entry.id)/group/\(group.id)", title: source.library.groupPath(of: group.id),
+                            detail: "Grupo · \(entry.name)") {
                     visit(LibraryLocation(scope: .project(group.id), databaseID: entry.id))
                 }
             }
@@ -1185,13 +1346,14 @@ struct LibraryView: View {
 }
 
 private enum CreationDialog: Identifiable {
-    case project, savedSearch(String), tag, renameTag(String), renameTagSeed(String)
+    case project, subgroup(UUID), savedSearch(String), tag, renameTag(String), renameTagSeed(String)
 
     var id: String { title }
 
     var title: String {
         switch self {
         case .project: "Nuevo grupo"
+        case .subgroup: "Nuevo subgrupo"
         case .savedSearch: "Guardar búsqueda"
         case .tag, .renameTagSeed: "Nueva etiqueta"
         case .renameTag: "Cambiar ruta de etiqueta"

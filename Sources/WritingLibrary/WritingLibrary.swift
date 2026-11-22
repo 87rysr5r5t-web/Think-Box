@@ -5,8 +5,20 @@ public struct Project: Codable, Identifiable, Equatable, Sendable {
     public var name: String
     public var tags: [String]?
     public var excludedFromTagging: Bool?
+    /// Containing group; nil (and every library saved before nesting) means top level.
+    public var parentID: UUID?
 
-    public init(name: String) { self.name = name }
+    public init(name: String, parentID: UUID? = nil) {
+        self.name = name
+        self.parentID = parentID
+    }
+}
+
+/// A group with the groups nested inside it, for the sidebar tree.
+public struct GroupBranch: Identifiable, Equatable, Sendable {
+    public let project: Project
+    public let children: [GroupBranch]?
+    public var id: UUID { project.id }
 }
 
 public enum DraftStage: String, Codable, CaseIterable, Sendable {
@@ -104,6 +116,55 @@ public struct WritingLibrary: Codable, Equatable, Sendable {
     public init() {}
 
     public var activeDocuments: [WritingDocument] { documents.filter { $0.trashedAt == nil } }
+
+    /// Groups as a tree. A group whose parent is missing, or that would close a cycle, is shown
+    /// at the top level so it never disappears.
+    public var groupTree: [GroupBranch] {
+        let known = Set(projects.map(\.id))
+        let byParent = Dictionary(grouping: projects) { project -> UUID? in
+            guard let parent = project.parentID, known.contains(parent), !ancestors(of: project.id).contains(project.id)
+            else { return nil }
+            return parent
+        }
+        func branches(under parent: UUID?) -> [GroupBranch] {
+            (byParent[parent] ?? []).map { project in
+                let children = branches(under: project.id)
+                return GroupBranch(project: project, children: children.isEmpty ? nil : children)
+            }
+        }
+        return branches(under: nil)
+    }
+
+    /// Parent chain of a group, nearest first; stops at a cycle.
+    public func ancestors(of id: UUID) -> [UUID] {
+        var chain: [UUID] = []
+        var current = projects.first { $0.id == id }?.parentID
+        while let parent = current, !chain.contains(parent), let project = projects.first(where: { $0.id == parent }) {
+            chain.append(parent)
+            if parent == id { break }
+            current = project.parentID
+        }
+        return chain
+    }
+
+    /// «Padre › Hijo» name of a group, for lists that show every group flat.
+    public func groupPath(of id: UUID) -> String {
+        let chain = ([id] + ancestors(of: id).filter { $0 != id }).reversed()
+        return chain.compactMap { group in projects.first { $0.id == group }?.name }.joined(separator: " › ")
+    }
+
+    /// Moves a group inside another (or to the top level with nil). Refuses moves into itself
+    /// or into one of its own descendants.
+    @discardableResult
+    public mutating func moveGroup(_ id: UUID, into parent: UUID?) -> Bool {
+        guard let index = projects.firstIndex(where: { $0.id == id }) else { return false }
+        if let parent {
+            guard parent != id, projects.contains(where: { $0.id == parent }),
+                  !ancestors(of: parent).contains(id) else { return false }
+        }
+        projects[index].parentID = parent
+        return true
+    }
 
     public func documents(in scope: LibraryScope, matching query: String = "") -> [WritingDocument] {
         results(in: scope, matching: query).compactMap { $0.fragment == nil ? $0.document : nil }

@@ -123,8 +123,8 @@ final class LibraryStore {
         return commit { $0.documents.append(document) } ? document.id : nil
     }
 
-    func createProject(_ name: String) -> UUID? {
-        let project = Project(name: name)
+    func createProject(_ name: String, parent: UUID? = nil) -> UUID? {
+        let project = Project(name: name, parentID: parent)
         return commit { $0.projects.append(project) } ? project.id : nil
     }
 
