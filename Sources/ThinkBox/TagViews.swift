@@ -21,7 +21,7 @@ struct TagEditor: View {
                                 } else {
                                     Text(tag)
                                 }
-                                Button("Quitar \(tag)", systemImage: "xmark") {
+                                Button("Quitar \(tag)", line: "xmark") {
                                     change(tags.filter { $0 != tag })
                                 }
                                 .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(.secondary)
@@ -64,7 +64,7 @@ struct FragmentTagSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Etiquetar fragmento").font(.title2.weight(.semibold))
+            Text("Etiquetar fragmento").uiFont(4, bold: true)
             Text(fragment.quote).lineLimit(4).foregroundStyle(.secondary).textSelection(.enabled)
             TagEditor(tags: selected, suggestions: tags, change: { selected = $0 })
             HStack {
@@ -122,7 +122,7 @@ struct ProjectTags: View {
     var body: some View {
         if let project = store.library.projects.first(where: { $0.id == id }) {
             VStack(alignment: .leading, spacing: 14) {
-                Text(project.name).font(.title2.weight(.semibold))
+                Text(project.name).uiFont(4, bold: true)
                 TagEditor(tags: project.tags ?? [], suggestions: store.library.availableTags, change: { tags in
                     update { $0.tags = tags }
                 })

@@ -17,6 +17,7 @@ mkdir -p "$app_path/Contents/MacOS"
 install -m 755 "$binary_dir/ThinkBox" "$app_path/Contents/MacOS/ThinkBox"
 install -m 644 "$project_root/scripts/Info.plist" "$app_path/Contents/Info.plist"
 ditto "$project_root/Sources/ThinkBox/Fonts" "$app_path/Contents/Resources/Fonts"
+install -m 644 "$project_root/scripts/AppIcon.icns" "$app_path/Contents/Resources/AppIcon.icns"
 codesign --force --sign - "$app_path"
 codesign --verify --strict "$app_path"
 

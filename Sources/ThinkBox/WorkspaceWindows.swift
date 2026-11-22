@@ -149,7 +149,12 @@ struct MainWindowTracker: NSViewRepresentable {
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            if let window { WorkspaceWindows.shared.mainWindow = window }
+            guard let window else { return }
+            WorkspaceWindows.shared.mainWindow = window
+            // Toolbar and title bar take the panel surface colour instead of the system material.
+            window.titlebarAppearsTransparent = true
+            window.backgroundColor = WindowPalette.nativeSurface
+            window.titleVisibility = .hidden
         }
     }
 }

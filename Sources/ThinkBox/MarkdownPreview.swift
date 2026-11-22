@@ -18,6 +18,8 @@ enum PageDisplay: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+/// Former page zoom. Kept only so saved reader states still decode; the value is ignored
+/// because the sheet scale now follows the panel width (F2-R07, F2-R08).
 enum PageZoom: Equatable, Codable {
     case width, fit, percent(Int)
 }
@@ -30,10 +32,8 @@ struct PageDestination: Equatable {
 struct PaginatedPreview: NSViewRepresentable {
     let pages: MarkdownPages
     let display: PageDisplay
-    let zoom: PageZoom
     let destination: PageDestination?
     let onPage: (Int) -> Void
-    let onZoom: (PageZoom) -> Void
     let onView: (PDFView) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -45,7 +45,7 @@ struct PaginatedPreview: NSViewRepresentable {
         view.setAccessibilityLabel("Previsualización paginada")
         view.backgroundColor = NSColor.windowBackgroundColor.blended(withFraction: 0.1, of: .black) ?? .windowBackgroundColor
         view.displaysPageBreaks = true
-        view.pageBreakMargins = NSEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
+        view.pageBreakMargins = NSEdgeInsets(top: 6, left: 0, bottom: 6, right: 0)
         view.minScaleFactor = 0.15
         view.maxScaleFactor = 4
         NotificationCenter.default.addObserver(context.coordinator, selector: #selector(Coordinator.pageChanged(_:)),
@@ -72,10 +72,7 @@ struct PaginatedPreview: NSViewRepresentable {
             coordinator.data = pages.data
             view.document = PDFDocument(data: pages.data)
         }
-        if changedData || changedDisplay || zoom != coordinator.zoom {
-            coordinator.zoom = zoom
-            coordinator.applyZoom(view)
-        }
+        if changedData || changedDisplay { coordinator.fitWidth(view) }
         if let destination, destination.id != coordinator.destination {
             coordinator.destination = destination.id
             coordinator.go(destination.index, in: view)
@@ -89,23 +86,19 @@ struct PaginatedPreview: NSViewRepresentable {
 
         override func layout() {
             super.layout()
-            guard let coordinator, !coordinator.updating, coordinator.zoom == .width || coordinator.zoom == .fit else { return }
-            coordinator.applyZoom(self)
+            guard let coordinator, !coordinator.updating else { return }
+            coordinator.fitWidth(self)
         }
 
-        override func magnify(with event: NSEvent) {
-            let value = min(400, max(50, Int(scaleFactor * (1 + event.magnification) * 100)))
-            autoScales = false
-            scaleFactor = CGFloat(value) / 100
-            coordinator?.parent.onZoom(.percent(value))
-        }
+        /// Pinch does nothing: the sheet scale is fixed by the panel width (F2-R07).
+        override func magnify(with event: NSEvent) {}
+        override func smartMagnify(with event: NSEvent) {}
     }
 
     @MainActor final class Coordinator: NSObject {
         var parent: PaginatedPreview
         var data: Data?
         var destination: UUID?
-        var zoom: PageZoom?
         var updating = false
         private var lastPage: Int?
 
@@ -131,23 +124,26 @@ struct PaginatedPreview: NSViewRepresentable {
             }
         }
 
-        func applyZoom(_ view: PDFView) {
-            switch zoom {
-            case .fit, .width:
-                guard let size = view.document?.page(at: 0)?.bounds(for: .mediaBox).size,
-                      size.width > 0, size.height > 0, view.bounds.width > 60, view.bounds.height > 50 else { return }
-                let shownPages: CGFloat = parent.display == .spreads ? 2 : 1
-                let width = (view.bounds.width - 28 * shownPages) / (size.width * shownPages)
-                let height = (view.bounds.height - 28) / size.height
-                let fit = max(view.minScaleFactor, min(view.maxScaleFactor, zoom == .fit ? min(width, height) : width))
-                if view.autoScales { view.autoScales = false }
-                if abs(view.scaleFactor - fit) > 0.002 { view.scaleFactor = fit }
-            case .percent(let value):
-                if view.autoScales { view.autoScales = false }
-                view.scaleFactor = CGFloat(value) / 100
-            case nil: break
+        /// F2-R08: the sheet (or the spread) fills the panel width minus ~3 mm on each side.
+        /// PDFView adds its own padding around pages, so the scale is corrected from the page's
+        /// measured on-screen width rather than guessed.
+        func fitWidth(_ view: PDFView) {
+            guard let page = view.document?.page(at: 0) else { return }
+            let size = page.bounds(for: .mediaBox).size
+            guard size.width > 0, view.bounds.width > 60 else { return }
+            let shownPages: CGFloat = parent.display == .spreads ? 2 : 1
+            let target = view.bounds.width - DesignTokens.pageBorder * 2
+            if view.autoScales { view.autoScales = false }
+            let scale = max(view.minScaleFactor, min(view.maxScaleFactor, target / (size.width * shownPages)))
+            if abs(view.scaleFactor - scale) > 0.002 { view.scaleFactor = scale }
+            // Correct against the width PDFView actually draws, in case it rounds or pads pages.
+            view.layoutDocumentView()
+            let drawn = view.convert(page.bounds(for: .mediaBox), from: page).width * shownPages
+            if drawn > 1, abs(drawn - target) > 1 {
+                view.scaleFactor = max(view.minScaleFactor, min(view.maxScaleFactor, view.scaleFactor * target / drawn))
             }
         }
+
     }
 }
 

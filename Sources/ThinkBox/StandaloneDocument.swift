@@ -26,8 +26,8 @@ struct StandaloneDocument: View {
                 VStack(spacing: 0) {
                     HStack {
                         Spacer()
-                        Button("Inspector", systemImage: "sidebar.right") { inspectorVisible.toggle() }
-                            .labelStyle(.iconOnly).help("Mostrar u ocultar inspector")
+                        Button("Inspector", line: "sidebar.right") { inspectorVisible.toggle() }
+                            .labelStyle(.iconOnly).buttonStyle(ChromeButtonStyle()).help("Mostrar u ocultar inspector")
                     }.padding(8)
                     GeometryReader { geometry in
                         HStack(spacing: 0) {
@@ -46,8 +46,8 @@ struct StandaloneDocument: View {
                                     resize: { inspectorWidth = min(380, max(200, -$0)) }) { inspectorVisible.toggle() }
                                 ScrollView {
                                     VStack(alignment: .leading, spacing: 12) {
-                                        Text("Inspector").font(.headline)
-                                        Text(document.displayTitle).font(.title3)
+                                        Text("Inspector").uiFont(0, bold: true)
+                                        Text(document.displayTitle).uiFont(2)
                                         Text(document.modifiedAt.formatted()).foregroundStyle(.secondary)
                                         TagEditor(tags: document.tags, suggestions: store.library.availableTags,
                                             change: { tags in store.update(document.id) { $0.tags = tags } })
@@ -100,7 +100,7 @@ struct StandaloneDocument: View {
                     Button("Aceptar", role: .cancel) { store.actionError = nil }
                 } message: { Text(store.actionError ?? "") }
             } else {
-                ContentUnavailableView("Documento no disponible", systemImage: "doc")
+                ContentUnavailableView("Documento no disponible", line: "doc")
             }
         }
     }

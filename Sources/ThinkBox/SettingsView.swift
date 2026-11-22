@@ -8,12 +8,12 @@ struct SettingsView: View {
 
     var body: some View {
         TabView {
-            appearance.tabItem { Label("Apariencia", systemImage: "circle.lefthalf.filled") }
-            editor.tabItem { Label("Editor", systemImage: "text.alignleft") }
-            library.tabItem { Label("Biblioteca", systemImage: "folder") }
-            reading.tabItem { Label("Lectura", systemImage: "book") }
-            pages.tabItem { Label("Página", systemImage: "doc") }
-            gestures.tabItem { Label("Gestos", systemImage: "hand.point.up.left") }
+            appearance.tabItem { Label("Apariencia", line: "circle.lefthalf.filled") }
+            editor.tabItem { Label("Editor", line: "text.alignleft") }
+            library.tabItem { Label("Biblioteca", line: "folder") }
+            reading.tabItem { Label("Lectura", line: "book") }
+            pages.tabItem { Label("Página", line: "doc") }
+            gestures.tabItem { Label("Gestos", line: "hand.point.up.left") }
         }
         .font(settings.font())
         .frame(width: 620, height: 540)
@@ -197,7 +197,7 @@ private struct FontFacePicker: View {
             Menu(AppFonts.label(selected)) {
                 ForEach([AppFonts.quattro, AppFonts.quattroBold, AppFonts.jetbrainsLight, AppFonts.system], id: \.self) { name in
                     Button { selected = name } label: {
-                        if selected == name { Label(AppFonts.label(name), systemImage: "checkmark") }
+                        if selected == name { Label(AppFonts.label(name), line: "checkmark") }
                         else { Text(AppFonts.label(name)) }
                     }
                 }
@@ -221,7 +221,7 @@ private struct InstalledFonts: View {
         let manager = NSFontManager.shared
         let families = manager.availableFontFamilies.filter { query.isEmpty || $0.localizedStandardContains(query) }
         VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.headline)
+            Text(title).uiFont(0, bold: true)
             TextField("Buscar familia tipográfica", text: $query)
             List(families, id: \.self, selection: $family) { Text($0).tag($0) }.frame(height: 220)
             if let family, let faces = manager.availableMembers(ofFontFamily: family) {

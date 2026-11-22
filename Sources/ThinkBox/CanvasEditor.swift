@@ -64,7 +64,7 @@ struct CanvasEditor: View {
         .sheet(item: $openedFile) { file in
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text(file.url.lastPathComponent).font(.headline)
+                    Text(file.url.lastPathComponent).uiFont(0, bold: true)
                     if let subpath = file.subpath, !subpath.isEmpty { Text(subpath).foregroundStyle(.secondary) }
                     Spacer()
                     Button("Cerrar") { openedFile = nil }.keyboardShortcut(.cancelAction)
@@ -80,28 +80,28 @@ struct CanvasEditor: View {
 
     private func toolbar(size: CGSize) -> some View {
         HStack(spacing: 12) {
-            Menu("Añadir nodo", systemImage: "plus") {
-                Button("Texto", systemImage: "text.alignleft") { addNode("text", size: size) }
-                Button("Archivo", systemImage: "doc") { addNode("file", size: size) }
-                Button("Enlace web", systemImage: "link") { addNode("link", size: size) }
-                Button("Grupo", systemImage: "rectangle.dashed") { addNode("group", size: size) }
-            }.menuStyle(.borderlessButton).fixedSize().disabled(!editable)
+            Menu("Añadir nodo", line: "plus") {
+                Button("Texto", line: "text.alignleft") { addNode("text", size: size) }
+                Button("Archivo", line: "doc") { addNode("file", size: size) }
+                Button("Enlace web", line: "link") { addNode("link", size: size) }
+                Button("Grupo", line: "rectangle.dashed") { addNode("group", size: size) }
+            }.menuStyle(.button).buttonStyle(ChromeButtonStyle()).fixedSize().disabled(!editable)
             if let fromID = connectingFrom, let from = board?.nodes.first(where: { $0.id == fromID }) {
                 Menu("Conectar con…", systemImage: "arrow.turn.down.right") {
                     ForEach((board?.nodes ?? []).filter { $0.id != fromID }) { node in
                         Button(nodeTitle(node)) { connect(from: from.id, to: node.id) }
                     }
                     Button("Cancelar") { connectingFrom = nil }
-                }.menuStyle(.borderlessButton).fixedSize()
+                }.menuStyle(.button).buttonStyle(ChromeButtonStyle()).fixedSize()
             }
             Spacer(minLength: 2)
-            Button("Alejar canvas", systemImage: "minus.magnifyingglass") { scale(zoom / 1.22, around: center(size)) }
-                .labelStyle(.iconOnly)
-            Text("\(Int(zoom * 100)) %").font(.caption).monospacedDigit().foregroundStyle(.secondary)
-            Button("Acercar canvas", systemImage: "plus.magnifyingglass") { scale(zoom * 1.22, around: center(size)) }
-                .labelStyle(.iconOnly)
-            Button("Encuadrar canvas", systemImage: "viewfinder") { fit(size) }.labelStyle(.iconOnly)
-            Menu("Opciones del canvas", systemImage: "ellipsis") {
+            Button("Alejar canvas", line: "minus.magnifyingglass") { scale(zoom / 1.22, around: center(size)) }
+                .labelStyle(.iconOnly).buttonStyle(ChromeButtonStyle())
+            Text("\(Int(zoom * 100)) %").uiFont(-2).monospacedDigit().foregroundStyle(.secondary)
+            Button("Acercar canvas", line: "plus.magnifyingglass") { scale(zoom * 1.22, around: center(size)) }
+                .labelStyle(.iconOnly).buttonStyle(ChromeButtonStyle())
+            Button("Encuadrar canvas", line: "viewfinder") { fit(size) }.labelStyle(.iconOnly).buttonStyle(ChromeButtonStyle())
+            Menu("Opciones del canvas", line: "ellipsis") {
                 Button("Vincular carpeta de archivos…", action: chooseRoot).disabled(!editable)
                 if let folder = document.attachment?.sourceFolder { Text(folder.lastPathComponent) }
                 Button("Exportar canvas…") { store.exportDocument(document) }
@@ -112,9 +112,9 @@ struct CanvasEditor: View {
                         }
                     }
                 }
-            }.labelStyle(.iconOnly).menuStyle(.borderlessButton).fixedSize()
+            }.labelStyle(.iconOnly).chromeMenu()
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(ChromeButtonStyle())
         .padding(.horizontal, 13).padding(.vertical, 7)
     }
 
@@ -154,7 +154,7 @@ struct CanvasEditor: View {
                 ForEach(board.nodes) { node in card(node, board: board) }
 
                 if board.nodes.isEmpty {
-                    ContentUnavailableView("Canvas vacío", systemImage: "rectangle.on.rectangle",
+                    ContentUnavailableView("Canvas vacío", line: "rectangle.on.rectangle",
                                            description: Text("Añade un nodo para empezar."))
                         .frame(width: geometry.size.width, height: geometry.size.height)
                         .allowsHitTesting(false)
@@ -212,7 +212,7 @@ struct CanvasEditor: View {
         }.onEnded { _ in finishDrag() })
         .overlay(alignment: .bottomTrailing) {
             if editable && selection == node.id {
-                Image(systemName: "arrow.up.left.and.arrow.down.right").font(.caption2)
+                ChromeSymbol(name: "arrow.up.left.and.arrow.down.right").uiFont(-3)
                     .frame(width: 21, height: 21).background(.regularMaterial, in: .rect(topLeadingRadius: 5))
                     .accessibilityLabel("Redimensionar nodo")
                     .gesture(DragGesture(minimumDistance: 1).onChanged { value in
