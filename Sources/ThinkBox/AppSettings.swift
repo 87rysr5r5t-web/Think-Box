@@ -1,3 +1,4 @@
+import WritingLibrary
 import AppKit
 import CoreText
 import SwiftUI
@@ -111,12 +112,36 @@ struct ReadingOptions: Codable {
     var fitCanvas = true
 }
 
+struct GestureOptions: Codable {
+    var enabled = true
+    var reverse = false
+    var cascade = true
+    var threshold = 0.40
+    var edge = 24
+    // Optional so settings saved before this control retain their other values.
+    var sensitivity: SwipeSensitivity? = nil
+    var horizontalWheel: Bool? = nil
+    var foldNodes: Bool? = nil
+}
+
+struct PageViewOptions: Codable {
+    var markdown = WritingPageViews()
+    var plainText = WritingPageViews()
+    var richText: WritingPageViews?
+    var html: WritingPageViews?
+    var layout = WritingPageLayout()
+    var darkPaper = false
+    var synchronize = true
+}
+
 @MainActor @Observable
 final class AppSettings {
     var appearance: AppearanceOptions { didSet { save(appearance, as: "appearance") } }
     var editor: EditorOptions { didSet { save(editor, as: "editor") } }
     var list: ListOptions { didSet { save(list, as: "list") } }
     var reader: ReadingOptions { didSet { save(reader, as: "reading") } }
+    var gestures: GestureOptions { didSet { save(gestures, as: "gestures") } }
+    var pages: PageViewOptions { didSet { save(pages, as: "pages") } }
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -125,6 +150,8 @@ final class AppSettings {
         editor = Self.load("editor", from: defaults, or: EditorOptions())
         list = Self.load("list", from: defaults, or: ListOptions())
         reader = Self.load("reading", from: defaults, or: ReadingOptions())
+        gestures = Self.load("gestures", from: defaults, or: GestureOptions())
+        pages = Self.load("pages", from: defaults, or: PageViewOptions())
     }
 
     func font(_ offset: Int = 0, bold: Bool = false, list: Bool = false) -> Font {

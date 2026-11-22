@@ -10,6 +10,8 @@ struct PDFReader: View {
     var item: WritingDocument
     var url: URL
     var jump: JumpRequest?
+    var readerRestore: DocumentReaderRestore? = nil
+    var onReaderState: ((DocumentReaderState) -> Void)? = nil
     var fragmentAction: (DocumentFragment, Bool) -> Void
 
     @ViewState private var pdfView: PDFView?
@@ -49,7 +51,9 @@ struct PDFReader: View {
                             }
                             PDFSurface(pdf: pdfView)
                                 .accessibilityLabel("Visor PDF")
-                                .onAppear { revealFragment() }
+                                .onAppear {
+                                    if readerRestore == nil { revealFragment() } else { restoreReading() }
+                                }
                         }
                         findBar
                     }
@@ -59,13 +63,20 @@ struct PDFReader: View {
             }
         }
         .onAppear(perform: load)
-        .onChange(of: jump) { revealFragment() }
-        .onChange(of: settings.reader.pdfLayout) { pdfView?.displayMode = settings.reader.pdfLayout.displayMode }
+        .onChange(of: jump) {
+            if readerRestore == nil { revealFragment() }
+        }
+        .onChange(of: readerRestore) { restoreReading() }
+        .onChange(of: settings.reader.pdfLayout) { setDisplay(settings.reader.pdfLayout.displayMode) }
         .onChange(of: settings.reader.pdfSidebar) { inspector = initialInspector }
+        .onChange(of: inspector) { reportReading() }
         .onChange(of: settings.reader.pdfZoom) { if let pdfView { applyZoom(to: pdfView) } }
         .onChange(of: settings.reader.pdfBackground) { if let pdfView { applyBackground(to: pdfView) } }
         .onReceive(NotificationCenter.default.publisher(for: .PDFViewPageChanged)) { event in
             if event.object as? PDFView === pdfView { updatePage() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .PDFViewScaleChanged)) { event in
+            if event.object as? PDFView === pdfView { reportReading() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .PDFViewSelectionChanged)) { event in
             if event.object as? PDFView === pdfView { selectionAvailable = pdfView?.currentSelection?.string?.isEmpty == false }
@@ -125,9 +136,9 @@ struct PDFReader: View {
                 Button("Etiquetar selección…") { pageAction(copy: false, selection: true) }.disabled(!selectionAvailable)
             }.menuStyle(.borderlessButton).menuIndicator(.hidden).labelStyle(.iconOnly).fixedSize().disabled(item.trashedAt != nil)
             Menu("Más herramientas PDF", systemImage: "ellipsis") {
-                Button("Página individual") { pdfView?.displayMode = .singlePage }
-                Button("Desplazamiento continuo") { pdfView?.displayMode = .singlePageContinuous }
-                Button("Doble página") { pdfView?.displayMode = .twoUpContinuous }
+                Button("Página individual") { setDisplay(.singlePage) }
+                Button("Desplazamiento continuo") { setDisplay(.singlePageContinuous) }
+                Button("Doble página") { setDisplay(.twoUpContinuous) }
                 Divider()
                 Button("Exportar página actual…", action: exportPage)
                 Button("Reconocer texto para la biblioteca (OCR)", action: recognize).disabled(recognitionRunning || item.trashedAt != nil)
@@ -164,7 +175,7 @@ struct PDFReader: View {
                 Text("Sin índice").foregroundStyle(.secondary).padding()
             } else {
                 List {
-                    OutlineGroup(entries, children: \.children) { entry in
+                    SwipeTree(nodes: entries, children: { $0.children }) { entry in
                         Button(entry.title) { if let destination = entry.outline.destination { pdfView?.go(to: destination) } }
                             .buttonStyle(.plain)
                     }
@@ -209,6 +220,30 @@ struct PDFReader: View {
         applyBackground(to: view)
         inspector = initialInspector
         pdfView = view
+        restoreReading()
+        updatePage()
+    }
+
+    private func setDisplay(_ mode: PDFDisplayMode) {
+        pdfView?.displayMode = mode
+        reportReading()
+    }
+
+    private func reportReading() {
+        guard let onReaderState, let view = pdfView, let document = view.document, !document.isLocked else { return }
+        let page = view.currentPage.map { document.index(for: $0) + 1 } ?? pageNumber
+        onReaderState(.pdf(PDFReaderState(page: page, scale: view.scaleFactor, autoScale: view.autoScales,
+            display: view.displayMode.rawValue, inspector: inspector?.rawValue)))
+    }
+
+    private func restoreReading() {
+        guard case .pdf(let snapshot) = readerRestore?.state, let view = pdfView,
+              let document = view.document, !document.isLocked else { return }
+        inspector = snapshot.inspector.flatMap(Inspector.init(rawValue:))
+        if let mode = PDFDisplayMode(rawValue: snapshot.display) { view.displayMode = mode }
+        view.autoScales = snapshot.autoScale
+        if !snapshot.autoScale, snapshot.scale > 0 { view.scaleFactor = snapshot.scale }
+        goTo(min(snapshot.page, document.pageCount))
         updatePage()
     }
 
@@ -238,7 +273,7 @@ struct PDFReader: View {
             updatePage()
             password = ""
             revision += 1
-            revealFragment()
+            if readerRestore == nil { revealFragment() } else { restoreReading() }
         } else { store.actionError = "Contraseña incorrecta." }
     }
 
@@ -247,6 +282,7 @@ struct PDFReader: View {
             pageNumber = pdf.index(for: page) + 1
             pageInput = String(pageNumber)
         }
+        reportReading()
     }
 
     private func goTo(_ number: Int) {
@@ -445,7 +481,7 @@ private struct PDFSurface: NSViewRepresentable {
     func updateNSView(_ view: PDFView, context: Context) {}
 }
 
-private struct PDFThumbnails: NSViewRepresentable {
+struct PDFThumbnails: NSViewRepresentable {
     let pdf: PDFView
     func makeNSView(context: Context) -> PDFThumbnailView {
         let view = PDFThumbnailView()
@@ -454,7 +490,9 @@ private struct PDFThumbnails: NSViewRepresentable {
         view.thumbnailSize = CGSize(width: 115, height: 140)
         return view
     }
-    func updateNSView(_ view: PDFThumbnailView, context: Context) {}
+    func updateNSView(_ view: PDFThumbnailView, context: Context) {
+        if view.pdfView !== pdf { view.pdfView = pdf }
+    }
 }
 
 private struct PDFOutlineEntry: Identifiable {

@@ -96,8 +96,8 @@ struct TagRuleControls: View {
     var store: LibraryStore
 
     var body: some View {
-        Toggle("Usar el nombre del proyecto como etiqueta", isOn: setting(\.projectNames))
-        Toggle("Heredar las etiquetas de los proyectos", isOn: setting(\.inheritProjectTags))
+        Toggle("Usar el nombre del grupo como etiqueta", isOn: setting(\.projectNames))
+        Toggle("Heredar las etiquetas de los grupos", isOn: setting(\.inheritProjectTags))
         Toggle("Leer hashtags en líneas independientes de Markdown", isOn: setting(\.hashtags))
         Toggle("Intercambiar etiquetas con Finder al importar y exportar", isOn: setting(\.finderTags))
         Toggle("Importar las palabras clave de los PDF", isOn: setting(\.pdfKeywords))

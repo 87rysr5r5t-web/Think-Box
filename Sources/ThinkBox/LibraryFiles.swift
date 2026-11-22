@@ -10,10 +10,40 @@ extension LibraryStore {
         filesFolder.appending(path: id.uuidString, directoryHint: .isDirectory)
     }
 
+    func markdownImageRoots(for id: UUID) -> [URL] {
+        [assetFolder(id), fileURL.deletingLastPathComponent()]
+    }
+
     func attachmentURL(for document: WritingDocument) -> URL? {
         guard let name = document.attachment?.filename, name == (name as NSString).lastPathComponent,
               name != ".", name != "..", !name.isEmpty else { return nil }
         return assetFolder(document.id).appending(path: name, directoryHint: .notDirectory)
+    }
+
+    func migrateRichTextAttachments() {
+        var converted: [UUID: (Data, String, String)] = [:]
+        for document in library.documents where document.attachment?.kind == .preview && document.richTextData == nil {
+            guard let url = attachmentURL(for: document) else { continue }
+            let ext = url.pathExtension.lowercased()
+            guard ["rtf", "rtfd", "html", "htm"].contains(ext) else { continue }
+            let type: NSAttributedString.DocumentType = ext == "rtf" ? .rtf : ext == "rtfd" ? .rtfd : .html
+            guard let value = try? NSAttributedString(url: url, options: [.documentType: type], documentAttributes: nil),
+                  let data = try? value.data(from: NSRange(location: 0, length: value.length),
+                    documentAttributes: [.documentType: NSAttributedString.DocumentType.rtfd]) else { continue }
+            converted[document.id] = (data, value.string, ext)
+        }
+        guard !converted.isEmpty else { return }
+        commit { library in
+            for index in library.documents.indices {
+                if let (data, text, format) = converted[library.documents[index].id] {
+                    library.documents[index].richTextData = data
+                    library.documents[index].richTextFormat = format
+                    library.documents[index].markdown = text
+                    library.documents[index].attachment = nil
+                }
+            }
+        }
+        // Original imported files remain in the assets folder for recovery.
     }
 
     func importDocuments(in scope: LibraryScope) -> UUID? {
@@ -36,6 +66,29 @@ extension LibraryStore {
                 case "md", "markdown", "txt", "text":
                     var encoding = String.Encoding.utf8
                     document.markdown = try String(contentsOf: url, usedEncoding: &encoding)
+                    if ext == "txt" || ext == "text" {
+                        document.plainText = true
+                    } else {
+                        let sourceFolder = url.deletingLastPathComponent()
+                        let assets = assetFolder(document.id)
+                        for reference in MarkdownBlocks.relativeImagePaths(in: document.markdown) {
+                            guard let source = MarkdownBlocks.localImageURL(reference, relativeTo: sourceFolder),
+                                  let path = reference.removingPercentEncoding else { continue }
+                            let target = assets.appending(path: path).standardizedFileURL
+                            if !copiedAssets.contains(assets) { copiedAssets.append(assets) }
+                            try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                            if !FileManager.default.fileExists(atPath: target.path) {
+                                try FileManager.default.copyItem(at: source, to: target)
+                            }
+                        }
+                    }
+                case "rtf", "rtfd", "html", "htm":
+                    let type: NSAttributedString.DocumentType = ext == "rtf" ? .rtf : ext == "rtfd" ? .rtfd : .html
+                    let attributed = try NSAttributedString(url: url, options: [.documentType: type], documentAttributes: nil)
+                    document.richTextData = try attributed.data(from: NSRange(location: 0, length: attributed.length),
+                        documentAttributes: [.documentType: NSAttributedString.DocumentType.rtfd])
+                    document.richTextFormat = ext
+                    document.markdown = attributed.string
                 case "canvas":
                     let data = try Data(contentsOf: url)
                     let board = try CanvasBoard(data: data)
@@ -136,13 +189,22 @@ extension LibraryStore {
     func exportDocument(_ document: WritingDocument) {
         let panel = NSSavePanel()
         panel.title = "Exportar archivo"
-        let ext = document.attachment.map { ($0.filename as NSString).pathExtension } ?? "md"
+        let ext = document.attachment.map { ($0.filename as NSString).pathExtension } ?? document.richTextFormat ?? (document.plainText == true ? "txt" : "md")
         if let type = UTType(filenameExtension: ext) { panel.allowedContentTypes = [type] }
         let name = document.displayTitle.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
         panel.nameFieldStringValue = ext.isEmpty ? name : "\(name).\(ext)"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            if let data = document.attachment?.canvasData {
+            if let data = document.richTextData {
+                let value = try NSAttributedString(data: data, options: [.documentType: NSAttributedString.DocumentType.rtfd], documentAttributes: nil)
+                if ext == "rtfd" {
+                    guard let wrapper = value.rtfdFileWrapper(from: NSRange(location: 0, length: value.length)) else { throw FileIssue.unsupported }
+                    try wrapper.write(to: url, options: .atomic, originalContentsURL: nil)
+                } else {
+                    let type: NSAttributedString.DocumentType = ["html", "htm"].contains(ext) ? .html : .rtf
+                    try value.data(from: NSRange(location: 0, length: value.length), documentAttributes: [.documentType: type]).write(to: url, options: .atomic)
+                }
+            } else if let data = document.attachment?.canvasData {
                 try data.write(to: url, options: .atomic)
             } else if let source = attachmentURL(for: document) {
                 if try source.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true {

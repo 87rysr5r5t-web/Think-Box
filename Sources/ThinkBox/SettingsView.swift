@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import WritingLibrary
 
 struct SettingsView: View {
     @Bindable var settings: AppSettings
@@ -11,9 +12,66 @@ struct SettingsView: View {
             editor.tabItem { Label("Editor", systemImage: "text.alignleft") }
             library.tabItem { Label("Biblioteca", systemImage: "folder") }
             reading.tabItem { Label("Lectura", systemImage: "book") }
+            pages.tabItem { Label("Página", systemImage: "doc") }
+            gestures.tabItem { Label("Gestos", systemImage: "hand.point.up.left") }
         }
         .font(settings.font())
         .frame(width: 620, height: 540)
+    }
+
+    private var pages: some View {
+        Form {
+            Section("Valores iniciales") {
+                writingViews("Markdown", options: $settings.pages.markdown)
+                writingViews("Texto plano", options: $settings.pages.plainText)
+                writingViews("Texto enriquecido", options: Binding(get: { settings.pages.richText ?? WritingPageViews() }, set: { settings.pages.richText = $0 }))
+                writingViews("HTML", options: Binding(get: { settings.pages.html ?? WritingPageViews() }, set: { settings.pages.html = $0 }))
+            }
+            Section("Visualización") {
+                Toggle("Usar papel oscuro en el tema oscuro", isOn: $settings.pages.darkPaper)
+                Toggle("Sincronizar el desplazamiento en vista dividida", isOn: $settings.pages.synchronize)
+            }
+            PageLayoutForm(layout: $settings.pages.layout)
+            Button("Restablecer ajustes de página") { settings.pages = PageViewOptions() }
+        }.formStyle(.grouped)
+    }
+
+    @ViewBuilder private func writingViews(_ title: String, options: Binding<WritingPageViews>) -> some View {
+        Picker(title, selection: options.mode) {
+            ForEach(WritingViewMode.allCases, id: \.self) { Text($0.title).tag($0) }
+        }
+        Toggle("Paginar el editor de " + title, isOn: options.editor)
+        Toggle("Paginar la previsualización de " + title, isOn: options.preview)
+    }
+
+    private var gestures: some View {
+        Form {
+            Toggle("Plegar y desplegar con dos dedos", isOn: $settings.gestures.enabled)
+            Picker("Sensibilidad", selection: Binding(
+                get: { settings.gestures.sensitivity ?? .medium },
+                set: { settings.gestures.sensitivity = $0 }
+            )) {
+                ForEach(SwipeSensitivity.allCases, id: \.self) { value in
+                    Text(value.title).tag(value)
+                }
+            }
+            Toggle("Plegar y desplegar nodos de árboles", isOn: Binding(
+                get: { settings.gestures.foldNodes ?? true },
+                set: { settings.gestures.foldNodes = $0 }
+            ))
+            Toggle("Invertir dirección", isOn: $settings.gestures.reverse)
+            Toggle("Permitir rueda horizontal del ratón", isOn: Binding(
+                get: { settings.gestures.horizontalWheel ?? false },
+                set: { settings.gestures.horizontalWheel = $0 }
+            ))
+            Toggle("Plegar paneles en cascada desde el visor", isOn: $settings.gestures.cascade)
+            LabeledContent("Recorrido para completar el gesto") {
+                Slider(value: $settings.gestures.threshold, in: 0.25...0.65, step: 0.05)
+                Text(settings.gestures.threshold.formatted(.percent.precision(.fractionLength(0))))
+            }
+            pointStepper("Zona de borde", value: $settings.gestures.edge, range: 12...48, step: 4)
+            Button("Restablecer gestos") { settings.gestures = GestureOptions() }
+        }.formStyle(.grouped)
     }
 
     private var appearance: some View {

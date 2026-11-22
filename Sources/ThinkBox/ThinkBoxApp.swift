@@ -7,14 +7,20 @@ typealias ViewState<Value> = State<Value>
 
 @main
 struct ThinkBoxApp: App {
-    @ViewState private var store = LibraryStore()
+    @NSApplicationDelegateAdaptor private var appDelegate: LibraryAppDelegate
+    @ViewState private var databases = LibraryDatabases()
     @ViewState private var settings = AppSettings()
 
     init() { AppFonts.register() }
 
     var body: some Scene {
         Window("Think Box", id: "library") {
-            LibraryView(store: store)
+            LibraryView(databases: databases)
+                .task {
+                    appDelegate.databases = databases
+                    await Task.yield()
+                    LibraryMenuCommands.orderNativeMenus()
+                }
                 .frame(minWidth: 930, minHeight: 540)
                 .environment(settings)
                 .font(settings.font())
@@ -27,7 +33,8 @@ struct ThinkBoxApp: App {
         .commands { LibraryMenuCommands() }
 
         WindowGroup("Documento", id: "document", for: ItemDestination.self) { destination in
-            StandaloneDocument(store: store, destination: destination.wrappedValue)
+            StandaloneDocument(databases: databases, destination: destination.wrappedValue)
+                .task { appDelegate.databases = databases }
                 .frame(minWidth: 600, minHeight: 450)
                 .environment(settings)
                 .font(settings.font())
@@ -37,9 +44,24 @@ struct ThinkBoxApp: App {
         }.defaultSize(width: 850, height: 700)
 
         Settings {
-            SettingsView(settings: settings, store: store)
+            SettingsView(settings: settings, store: databases.activeStore)
                 .preferredColorScheme(settings.appearance.theme.colorScheme)
                 .environment(\.locale, Locale(identifier: "es_ES"))
         }
+    }
+}
+
+@MainActor
+final class LibraryAppDelegate: NSObject, NSApplicationDelegate {
+    weak var databases: LibraryDatabases?
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard databases?.flushEdits() == false else { return .terminateNow }
+        let alert = NSAlert()
+        alert.messageText = "Hay cambios pendientes de guardar"
+        alert.informativeText = "Think Box sigue abierto para que puedas resolver el problema de escritura y volver a guardar."
+        alert.addButton(withTitle: "Volver a Think Box")
+        alert.runModal()
+        return .terminateCancel
     }
 }

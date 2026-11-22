@@ -9,5 +9,6 @@ let package = Package(
         .target(name: "WritingLibrary"),
         .executableTarget(name: "ThinkBox", dependencies: ["WritingLibrary"], resources: [.copy("Fonts")]),
         .testTarget(name: "WritingLibraryTests", dependencies: ["WritingLibrary"]),
+        .testTarget(name: "ThinkBoxTests", dependencies: ["ThinkBox", "WritingLibrary"]),
     ]
 )

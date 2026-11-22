@@ -1,6 +1,6 @@
 import Foundation
 
-public struct TagSettings: Codable, Equatable {
+public struct TagSettings: Codable, Equatable, Sendable {
     public var projectNames = false
     public var inheritProjectTags = false
     public var hashtags = false

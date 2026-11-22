@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Project: Codable, Identifiable, Equatable {
+public struct Project: Codable, Identifiable, Equatable, Sendable {
     public var id = UUID()
     public var name: String
     public var tags: [String]?
@@ -9,7 +9,7 @@ public struct Project: Codable, Identifiable, Equatable {
     public init(name: String) { self.name = name }
 }
 
-public enum DraftStage: String, Codable, CaseIterable {
+public enum DraftStage: String, Codable, CaseIterable, Sendable {
     case draft, revision, finished
 
     public var title: String {
@@ -21,7 +21,7 @@ public enum DraftStage: String, Codable, CaseIterable {
     }
 }
 
-public struct WritingDocument: Codable, Identifiable, Equatable {
+public struct WritingDocument: Codable, Identifiable, Equatable, Sendable {
     public var id = UUID()
     public var title: String
     public var markdown: String
@@ -32,6 +32,11 @@ public struct WritingDocument: Codable, Identifiable, Equatable {
     public var trashedAt: Date?
     public var attachment: DocumentAttachment?
     public var fragments: [DocumentFragment]?
+    public var pageLayout: WritingPageLayout?
+    public var pageViews: WritingPageViews?
+    public var plainText: Bool?
+    public var richTextData: Data?
+    public var richTextFormat: String?
 
     public init(title: String = "Sin título", markdown: String = "", projectIDs: Set<UUID> = []) {
         self.title = title
@@ -52,7 +57,7 @@ public struct WritingDocument: Codable, Identifiable, Equatable {
     }
 
     public var linkTargets: Set<ItemDestination> {
-        let linkPattern = /(thinkbox:\/\/document\/[0-9a-fA-F-]{36}(?:#[0-9a-fA-F-]{36})?)/
+        let linkPattern = /(thinkbox:\/\/document\/[0-9a-fA-F-]{36}(?:\?base=[0-9a-fA-F-]{36})?(?:#[0-9a-fA-F-]{36})?)/
         return Set(markdown.matches(of: linkPattern).compactMap { match in
             URL(string: String(match.1)).flatMap(ItemDestination.init(url:))
         })
@@ -73,7 +78,7 @@ public struct WritingDocument: Codable, Identifiable, Equatable {
     }
 }
 
-public struct SavedSearch: Codable, Identifiable, Equatable {
+public struct SavedSearch: Codable, Identifiable, Equatable, Sendable {
     public var id = UUID()
     public var name: String
     public var query: String
@@ -84,11 +89,11 @@ public struct SavedSearch: Codable, Identifiable, Equatable {
     }
 }
 
-public enum LibraryScope: Hashable {
+public enum LibraryScope: Hashable, Codable {
     case all, inbox, drafts, trash, project(UUID), savedSearch(UUID), tag(String)
 }
 
-public struct WritingLibrary: Codable, Equatable {
+public struct WritingLibrary: Codable, Equatable, Sendable {
     public var formatVersion = 2
     public var projects: [Project] = []
     public var documents: [WritingDocument] = []
@@ -131,6 +136,7 @@ public struct WritingLibrary: Codable, Equatable {
             return $0.modifiedAt > $1.modifiedAt
         }
         let includeFragments = criteria.contains { !$0.isEmpty }
+        if !includeFragments { return sorted.map { LibraryResult(document: $0, fragment: nil) } }
         return sorted.flatMap { document -> [LibraryResult] in
             let tags = effectiveTags(of: document)
             var matches: [LibraryResult] = []
@@ -138,12 +144,10 @@ public struct WritingLibrary: Codable, Equatable {
             if criteria.allSatisfy({ $0.matches(title: document.displayTitle, body: body, tags: tags) }) {
                 matches.append(LibraryResult(document: document, fragment: nil))
             }
-            if includeFragments {
-                for fragment in document.fragments ?? [] where criteria.allSatisfy({
-                    $0.matches(title: document.displayTitle, body: fragment.quote, tags: fragment.tags)
-                }) {
-                    matches.append(LibraryResult(document: document, fragment: fragment))
-                }
+            for fragment in document.fragments ?? [] where criteria.allSatisfy({
+                $0.matches(title: document.displayTitle, body: fragment.quote, tags: fragment.tags)
+            }) {
+                matches.append(LibraryResult(document: document, fragment: fragment))
             }
             return matches
         }
@@ -155,11 +159,11 @@ public struct WritingLibrary: Codable, Equatable {
         try data.write(to: url, options: .atomic)
     }
 
-    public static func read(from url: URL) throws -> Self {
+    public static func read(from url: URL, requiresExistingFile: Bool = false) throws -> Self {
         let data: Data
         do {
             data = try Data(contentsOf: url)
-        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile && !requiresExistingFile {
             return Self()
         }
         var library = try JSONDecoder().decode(Self.self, from: data)

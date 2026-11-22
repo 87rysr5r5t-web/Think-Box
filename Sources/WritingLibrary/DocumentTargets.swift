@@ -4,20 +4,25 @@ import Foundation
 public struct ItemDestination: Hashable, Codable {
     public let documentID: UUID
     public let fragmentID: UUID?
+    public let databaseID: UUID?
 
-    public init(_ documentID: UUID, fragmentID: UUID? = nil) {
+    public init(_ documentID: UUID, fragmentID: UUID? = nil, databaseID: UUID? = nil) {
         self.documentID = documentID
         self.fragmentID = fragmentID
+        self.databaseID = databaseID
     }
 
     public init?(url: URL) {
         guard url.scheme?.lowercased() == "thinkbox", url.host?.lowercased() == "document",
               url.pathComponents.count == 2, let id = UUID(uuidString: url.lastPathComponent) else { return nil }
+        let database = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "base" }
+        let databaseID = database?.value.flatMap(UUID.init(uuidString:))
+        guard database == nil || databaseID != nil else { return nil }
         if let fragment = url.fragment {
             guard let fragmentID = UUID(uuidString: fragment) else { return nil }
-            self.init(id, fragmentID: fragmentID)
+            self.init(id, fragmentID: fragmentID, databaseID: databaseID)
         } else {
-            self.init(id)
+            self.init(id, databaseID: databaseID)
         }
     }
 
@@ -26,6 +31,7 @@ public struct ItemDestination: Hashable, Codable {
         components.scheme = "thinkbox"
         components.host = "document"
         components.path = "/\(documentID.uuidString)"
+        if let databaseID { components.queryItems = [URLQueryItem(name: "base", value: databaseID.uuidString)] }
         components.fragment = fragmentID?.uuidString
         return components.url!
     }
@@ -37,7 +43,7 @@ public struct ItemDestination: Hashable, Codable {
     }
 }
 
-public struct TextAnchor: Codable, Equatable {
+public struct TextAnchor: Codable, Equatable, Sendable {
     public private(set) var location: Int
     public let quote: String
     private let before: String
@@ -91,7 +97,7 @@ public struct TextAnchor: Codable, Equatable {
     }
 }
 
-public struct PDFTextSpan: Codable, Equatable {
+public struct PDFTextSpan: Codable, Equatable, Sendable {
     public let page: Int
     public let anchor: TextAnchor
 
@@ -101,13 +107,13 @@ public struct PDFTextSpan: Codable, Equatable {
     }
 }
 
-public enum FragmentLocation: Codable, Equatable {
+public enum FragmentLocation: Codable, Equatable, Sendable {
     case text(TextAnchor)
     case pdf(page: Int, spans: [PDFTextSpan])
     case pdfArea(page: Int, bounds: CGRect)
 }
 
-public struct DocumentFragment: Codable, Equatable, Identifiable {
+public struct DocumentFragment: Codable, Equatable, Identifiable, Sendable {
     public var id = UUID()
     public var quote: String
     public var location: FragmentLocation
@@ -127,7 +133,7 @@ public struct LibraryResult: Identifiable {
     public var id: ItemDestination { ItemDestination(document.id, fragmentID: fragment?.id) }
 }
 
-public enum AttachmentKind: String, Codable {
+public enum AttachmentKind: String, Codable, Sendable {
     case pdf, canvas, preview
 
     public var label: String {
@@ -139,7 +145,7 @@ public enum AttachmentKind: String, Codable {
     }
 }
 
-public struct DocumentAttachment: Codable, Equatable {
+public struct DocumentAttachment: Codable, Equatable, Sendable {
     public let filename: String
     public let kind: AttachmentKind
     public var sourceFolder: URL?

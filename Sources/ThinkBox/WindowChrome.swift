@@ -8,6 +8,7 @@ enum DesignTokens {
     static let buttonHitSize: CGFloat = 27
     static let windowInset: CGFloat = 28
     static let headerHeight: CGFloat = 64
+    static let writingPanelHeaderHeight: CGFloat = 30
     static let paletteWidth: CGFloat = 520
     static let paletteHeight: CGFloat = 340
     static let palettePadding: CGFloat = 12

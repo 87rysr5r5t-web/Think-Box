@@ -16,22 +16,36 @@ enum WorkspaceLayout: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-enum InspectorSection: String, CaseIterable, Identifiable {
+enum InspectorSection: String, CaseIterable, Identifiable, Codable {
     case details = "Información", links = "Enlaces"
     var id: Self { self }
 }
 
-struct LibraryLocation: Equatable {
+struct LibraryLocation: Equatable, Codable {
     var scope: LibraryScope = .all
     var selection: ItemDestination?
     var target: ItemDestination?
     var query = ""
+    var databaseID: UUID?
 }
 
-struct LibraryTab: Identifiable {
-    let id = UUID()
+struct LibraryTab: Identifiable, Codable {
+    var id = UUID()
     var location = LibraryLocation()
     var history = NavigationHistory<LibraryLocation>()
+
+    enum CodingKeys: String, CodingKey { case id, location, panels }
+    var panels: TabPanels?
+}
+
+struct TabPanels: Codable {
+    var sidebarVisible: Bool
+    var sidebarWidth: Int
+    var listVisible: Bool
+    var listWidth: Double
+    var listHeight: Double
+    var inspectorVisible: Bool
+    var inspectorWidth: Double
 }
 
 struct WorkspaceDivider: View {
@@ -58,4 +72,15 @@ struct WorkspaceDivider: View {
             }
             .accessibilityHidden(true)
     }
+}
+
+struct SavedWorkspace: Identifiable, Codable {
+    var id = UUID()
+    var name: String
+    var tabs: [LibraryTab]
+    var activeTab: Int
+    var layouts: Data
+    var inspector: InspectorSection
+    var documentWindows: [SavedDocumentWindow]?
+    var mainFrame: SavedWindowFrame?
 }
